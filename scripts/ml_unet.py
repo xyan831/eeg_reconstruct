@@ -14,17 +14,35 @@ from .model_unet import UNet1D
 from .visualize import save_pred_side
 
 class ml_unet:
-    def __init__(self, path_list, name_list, prefix, data_type):
-        self.data_path, self.model_path, self.gen_path, self.visual_path = path_list
-        self.model_name, self.result_name, self.gen_name = name_list
-        self.prefix = prefix
-        self.data_type = data_type
+    def __init__(self, name, model, data_path, model_path, gen_path, visual_path):
+        self.data_path
+        self.model_path
+        self.gen_path
+        self.visual_path = path_list
+        self.name = name
+        self.model = model
+        self.label = "data"
+        self.config()
+
+    def config(data_type="both", mask_type="random", epoch_num=10, ch_max=4):
+        self.model_name = f"{self.model}_{mask_type}{ch_max}_e{epoch_num}_unet.pth"
+        self.result_name = f"{self.name}{data_type}_e{epoch_num}_unet"
+        self.norm_name = f"{self.name}{data_type}_{mask_type}{ch_max}_data_norm.mat"
+        self.mask_name = f"{self.name}{data_type}_{mask_type}{ch_max}_data_mask.mat"
+        self.epoch_num = epoch_num
+        
+        if data_type=="seiz":
+            self.gen_name = [f"{self.name}_seizure_data.mat", "seizure_data"]
+        elif data_type=="nseiz":
+            self.gen_name = [f"{self.name}_non_seizure_data.mat", "non_seizure_data"]
+        else:
+            self.gen_name = [f"{self.name}_data.mat", self.label]
 
     def get_data(self):
         # load normal and masked data
         print("Loading dataset")
-        data_orig = load_mat(os.path.join(self.data_path, f"{self.prefix}{self.data_type}_data_norm.mat"), "data")
-        data_mask = load_mat(os.path.join(self.data_path, f"{self.prefix}{self.data_type}_data_mask.mat"), "data")
+        data_orig = load_mat(os.path.join(self.data_path, self.norm_name), self.label)
+        data_mask = load_mat(os.path.join(self.data_path, self.mask_name), self.label)
         
         # crop timesteps to fit unet (divisible by 2^(num_encoder_layers) = 2^4 = 16)
         print("Cropping data")
@@ -41,15 +59,16 @@ class ml_unet:
         print("Visualize results")
         ch_list = list(range(1,out_ch+1))
         #print(ch_list)
-        result_name_full = [f"{self.result_name}_norm_s{sample}.pdf", f"{self.result_name}_unnorm_s{sample}.pdf"]
+        result_name_norm = f"{self.result_name}_norm_s{sample}.pdf"
+        result_name_unnorm = f"{self.result_name}_unnorm_s{sample}.pdf"
         # normalized
-        save_pred_side(os.path.join(visual_path, result_name_full[0]), y_pred[0], y_test[0], X_test[0], ch_list, sample)
-        print("normalized results recorded as", result_name_full[0])
+        save_pred_side(os.path.join(self.visual_path, result_name_norm), y_pred[0], y_test[0], X_test[0], ch_list, sample)
+        print("normalized results recorded as", result_name_norm)
         # un-normalized
-        save_pred_side(os.path.join(visual_path, result_name_full[1]), y_pred[1], yo_test[1], Xo_test[1], ch_list, sample)
-        print("un_normalized results recorded as", result_name_full[1])
+        save_pred_side(os.path.join(self.visual_path, result_name_unnorm), y_pred[1], yo_test[1], Xo_test[1], ch_list, sample)
+        print("un_normalized results recorded as", result_name_unnorm)
 
-    def train(self, epoch_num=10, sample=0):
+    def train(self, sample=0):
         # prepare data
         print("Prepare training data")
         X_orig, y_orig = self.get_data()
@@ -92,7 +111,7 @@ class ml_unet:
         
         # Train and save model
         print("Training model")
-        train_model(device, model, train_loader, criterion, optimizer, epochs=epoch_num)
+        train_model(device, model, train_loader, criterion, optimizer, epochs=self.epoch_num)
         torch.save(model.state_dict(), os.path.join(self.model_path, self.model_name))
         print("Model train complete, saved as", self.model_name)
         
@@ -116,7 +135,7 @@ class ml_unet:
         
         self.visualize([y_pred, y_pred3], [y_test, yo_test], [X_test, Xo_test], sample=sample)
 
-    def test(self, epoch_num=10, sample=0):
+    def test(self, sample=0):
         # prepare data
         print("Prepare training data")
         X_orig, y_orig = self.get_data()
@@ -148,7 +167,7 @@ class ml_unet:
         optimizer = optim.Adam(model.parameters(), lr=0.001)
         
         # load pretrained model
-        state_dict = torch.load(os.path.join(model_path, model_name), weights_only=True)
+        state_dict = torch.load(os.path.join(self.model_path, self.model_name), weights_only=True)
         model.load_state_dict(state_dict)
         
         # Get generated data

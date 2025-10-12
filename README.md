@@ -6,8 +6,9 @@
 
 ```
 ©À©¤©¤ /data
-©¦   ©À©¤©¤ chb-mit/
-©¦   ©¸©¤©¤ ourdata/
+©¦   ©À©¤©¤ CHB-MIT/
+©¦   ©À©¤©¤ NICU/
+©¦   ©¸©¤©¤ Our/
 ©À©¤©¤ /result
 ©¦   ©À©¤©¤ data_gen/
 ©¦   ©À©¤©¤ data_mat/
@@ -19,8 +20,9 @@
 ```
 
 - ``/data``: .edf files. EEG data with seizure information.
-    - ``chb-mit/``: from CHB MIT database
-    - ``ourdata/``: from patients
+    - ``CHB-MIT/``: from CHB MIT database
+	- ``NICU``: from NICU database
+    - ``Our/``: from patients
 - ``/result``: generated files from scripts
     - ``data_gen/``: .mat files. reconstructed EEG data
     - ``data_mat/``: .mat files. 500 timestep samples from .edf rawdata
@@ -38,5 +40,5 @@
     - ``model_unet.py``
     - ``model_util.py``
     - ``visualize.py``
-- ``run.py``: execute this file
+- ``run.py``: edit and execute this file for whatever function you need
 
