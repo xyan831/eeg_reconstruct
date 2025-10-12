@@ -4,21 +4,6 @@
 
 ### Directory Structure
 
-```
-©À©¤©¤ /data
-©¦   ©À©¤©¤ CHB-MIT/
-©¦   ©À©¤©¤ NICU/
-©¦   ©¸©¤©¤ Our/
-©À©¤©¤ /result
-©¦   ©À©¤©¤ data_gen/
-©¦   ©À©¤©¤ data_mat/
-©¦   ©À©¤©¤ data_train/
-©¦   ©À©¤©¤ model/
-©¦   ©¸©¤©¤ visual/
-©À©¤©¤ /scripts
-©¸©¤©¤ run.py
-```
-
 - ``/data``: .edf files. EEG data with seizure information.
     - ``CHB-MIT/``: from CHB MIT database
 	- ``NICU``: from NICU database
