@@ -7,7 +7,7 @@ import numpy as np
 # U-net Model Definition
 # ----------------------
 
-# Full UNet1D with Attention
+# Full UNet1D
 class UNet1D(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(UNet1D, self).__init__()
@@ -27,14 +27,17 @@ class UNet1D(nn.Module):
         self.outc = nn.Conv1d(64, out_channels, kernel_size=1)
 
     def forward(self, x):
+        # Encoder
         x1 = self.inc(x)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
         x4 = self.down3(x3)
         x5 = self.down4(x4)
 
+        # Bottleneck
         x6 = self.bottleneck(x5)
 
+        # Decoder
         x = self.up1(x6, x4)
         x = self.up2(x, x3)
         x = self.up3(x, x2)
@@ -42,79 +45,65 @@ class UNet1D(nn.Module):
 
         return self.outc(x), x6
 
-# Attention Block: Channel + Temporal
-class AttentionBlock1D(nn.Module):
-    def __init__(self, channels, reduction=16):
-        super(AttentionBlock1D, self).__init__()
-        # Channel Attention
-        self.avg_pool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Sequential(
-            nn.Conv1d(channels, channels // reduction, 1, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Conv1d(channels // reduction, channels, 1, bias=False),
-            nn.Sigmoid()
-        )
-        # Temporal Attention
-        self.conv_temporal = nn.Sequential(
-            nn.Conv1d(channels, channels, kernel_size=7, padding=3, groups=channels),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        # Channel-wise
-        ca = self.fc(self.avg_pool(x))
-        x = x * ca
-        # Temporal-wise
-        ta = self.conv_temporal(x)
-        x = x * ta
-        return x
-
-# DoubleConv with Attention
 class DoubleConv(nn.Module):
-    def __init__(self, in_ch, out_ch):
-        super(DoubleConv, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv1d(in_ch, out_ch, kernel_size=3, padding=1),
-            nn.BatchNorm1d(out_ch),
+    """(convolution => [BN] => ReLU) * 2"""
+    
+    def __init__(self, in_channels, out_channels, mid_channels=None):
+        super().__init__()
+        if not mid_channels:
+            mid_channels = out_channels
+        self.double_conv = nn.Sequential(
+            nn.Conv1d(in_channels, mid_channels, kernel_size=3, padding=1),
+            nn.BatchNorm1d(mid_channels),
             nn.ReLU(inplace=True),
-            nn.Conv1d(out_ch, out_ch, kernel_size=3, padding=1),
-            nn.BatchNorm1d(out_ch),
+            nn.Conv1d(mid_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm1d(out_channels),
             nn.ReLU(inplace=True)
         )
-        self.attn = AttentionBlock1D(out_ch)
 
     def forward(self, x):
-        x = self.conv(x)
-        x = self.attn(x)
-        return x
+        return self.double_conv(x)
 
-# Downsampling block
 class Down(nn.Module):
-    def __init__(self, in_ch, out_ch):
-        super(Down, self).__init__()
-        self.down = nn.Sequential(
+    """Downscaling with maxpool then double conv"""
+    
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.maxpool_conv = nn.Sequential(
             nn.MaxPool1d(2),
-            DoubleConv(in_ch, out_ch)
+            DoubleConv(in_channels, out_channels)
         )
 
     def forward(self, x):
-        return self.down(x)
+        return self.maxpool_conv(x)
 
-# Upsampling block
 class Up(nn.Module):
-    def __init__(self, in_ch, out_ch):
-        super(Up, self).__init__()
-        self.up = nn.Upsample(scale_factor=2, mode='linear', align_corners=True)
-        self.conv = DoubleConv(in_ch, out_ch)
+    """Upscaling then double conv"""
+    
+    def __init__(self, in_channels, out_channels, bilinear=True):
+        super().__init__()
+        
+        # if bilinear, use the normal convolutions to reduce the number of channels
+        if bilinear:
+            self.up = nn.Upsample(scale_factor=2, mode='linear', align_corners=True)
+            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
+        else:
+            self.up = nn.ConvTranspose1d(in_channels, in_channels // 2, kernel_size=2, stride=2)
+            self.conv = DoubleConv(in_channels, out_channels)
 
     def forward(self, x1, x2):
         x1 = self.up(x1)
-        # Pad if size mismatch due to rounding
-        diff = x2.size(-1) - x1.size(-1)
+        
+        # input is CHW
+        diff = x2.size()[2] - x1.size()[2]
+        
+        # Pad if necessary
         if diff > 0:
-            x1 = F.pad(x1, (0, diff))
+            x1 = F.pad(x1, [diff // 2, diff - diff // 2])
         elif diff < 0:
-            x2 = F.pad(x2, (0, -diff))
+            x2 = F.pad(x2, [-diff // 2, -(-diff // 2)])
+        
+        # Concatenate along channel dimension
         x = torch.cat([x2, x1], dim=1)
         return self.conv(x)
 

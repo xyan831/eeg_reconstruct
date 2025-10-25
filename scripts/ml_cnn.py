@@ -1,12 +1,13 @@
+import os
+import numpy as np
+from scipy.io import loadmat
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
-from scipy.io import loadmat
-import numpy as np
 
-from .data_util import load_mat
-
+from .data_util import mat2numpy
 from .model_util import get_datalabel, kfold_split, torch_dataloader
 from .model_cnn import CNN
 
@@ -18,8 +19,8 @@ class ml_cnn:
         self.nseiz_path = os.path.join(data_path, f"{prefix}_non_seizure_data.mat")
 
     def get_data(self):
-        seiz_data = load_mat(self.seiz_path, "seizure_data")
-        nseiz_data = load_mat(self.nseiz_path, "non_seizure_data")
+        seiz_data = mat2numpy(self.seiz_path, "seizure_data")
+        nseiz_data = mat2numpy(self.nseiz_path, "non_seizure_data")
         
         full_data = np.concatenate((seiz_data, nseiz_data), axis=0)
         full_label = get_datalabel(seiz_data, nseiz_data)

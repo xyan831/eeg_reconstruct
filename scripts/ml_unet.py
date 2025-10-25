@@ -1,74 +1,71 @@
 import os
 import numpy as np
 from scipy.io import savemat
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
-from .data_util import load_mat, crop_timestep
-
+from .data_util import mat2numpy, crop_timestep
 from .model_util import normalize, torch_dataloader, train_model, predict
-from .model_unet import UNet1D
+#from .model_unet import UNet1D
+from .model_unet_att import UNet1D
 from .visualize import save_pred_side
 
 class ml_unet:
-    def __init__(self, name, model, data_path, model_path, gen_path, visual_path):
-        self.data_path
-        self.model_path
-        self.gen_path
-        self.visual_path = path_list
+    def __init__(self, data_path, model_path, gen_path, visual_path, name, model):
+        self.data_path = data_path
+        self.model_path = model_path
+        self.gen_path = gen_path
+        self.visual_path = visual_path
         self.name = name
         self.model = model
         self.label = "data"
         self.config()
 
-    def config(data_type="both", mask_type="random", epoch_num=10, ch_max=4):
-        self.model_name = f"{self.model}_{mask_type}{ch_max}_e{epoch_num}_unet.pth"
-        self.result_name = f"{self.name}{data_type}_e{epoch_num}_unet"
-        self.norm_name = f"{self.name}{data_type}_{mask_type}{ch_max}_data_norm.mat"
-        self.mask_name = f"{self.name}{data_type}_{mask_type}{ch_max}_data_mask.mat"
+    def config(self, data_type="both", epoch_num=10, sample=0):
+        self.model_name = f"{self.model}_e{epoch_num}_unet.pth"
+        self.norm_name = f"{self.name}_norm_{data_type}.mat"
+        self.mask_name = f"{self.name}_mask_{data_type}.mat"
         self.epoch_num = epoch_num
-        
         if data_type=="seiz":
-            self.gen_name = [f"{self.name}_seizure_data.mat", "seizure_data"]
+            self.gen_name = f"{self.name}_seizure_data.mat"
         elif data_type=="nseiz":
-            self.gen_name = [f"{self.name}_non_seizure_data.mat", "non_seizure_data"]
+            self.gen_name = f"{self.name}_non_seizure_data.mat"
         else:
-            self.gen_name = [f"{self.name}_data.mat", self.label]
+            self.gen_name = f"{self.name}_data.mat"
+        self.sample = sample
+        self.result_name_norm = f"{self.name}{data_type}_e{epoch_num}_unet_norm_s{sample}.pdf"
+        self.result_name_unnorm = f"{self.name}{data_type}_e{epoch_num}_unet_unnorm_s{sample}.pdf"
 
     def get_data(self):
         # load normal and masked data
         print("Loading dataset")
-        data_orig = load_mat(os.path.join(self.data_path, self.norm_name), self.label)
-        data_mask = load_mat(os.path.join(self.data_path, self.mask_name), self.label)
-        
+        data_orig = mat2numpy(os.path.join(self.data_path, self.norm_name), self.label)
+        data_mask = mat2numpy(os.path.join(self.data_path, self.mask_name), self.label)
         # crop timesteps to fit unet (divisible by 2^(num_encoder_layers) = 2^4 = 16)
         print("Cropping data")
         crop_orig = crop_timestep(data_orig, 16)
         crop_mask = crop_timestep(data_mask, 16)
         #print(crop_norm.shape, crop_mask.shape)
-        
-        print("Data cropped")
-        
+        print("Data cropped")        
         return crop_mask, crop_orig
 
-    def visualize(self, y_pred, y_test, X_test, sample=0):
+    def visualize(self, out_ch, y_pred, y_test, X_test):
         # visualize and compare prediction (saved to pdf)
         print("Visualize results")
-        ch_list = list(range(1,out_ch+1))
+        ch_list = list(range(1, out_ch+1))
         #print(ch_list)
-        result_name_norm = f"{self.result_name}_norm_s{sample}.pdf"
-        result_name_unnorm = f"{self.result_name}_unnorm_s{sample}.pdf"
         # normalized
-        save_pred_side(os.path.join(self.visual_path, result_name_norm), y_pred[0], y_test[0], X_test[0], ch_list, sample)
-        print("normalized results recorded as", result_name_norm)
+        save_pred_side(os.path.join(self.visual_path, self.result_name_norm), y_pred[0], y_test[0], X_test[0], ch_list, self.sample)
+        print("normalized results recorded as", self.result_name_norm)
         # un-normalized
-        save_pred_side(os.path.join(self.visual_path, result_name_unnorm), y_pred[1], yo_test[1], Xo_test[1], ch_list, sample)
-        print("un_normalized results recorded as", result_name_unnorm)
+        save_pred_side(os.path.join(self.visual_path, self.result_name_unnorm), y_pred[1], y_test[1], X_test[1], ch_list, self.sample)
+        print("un_normalized results recorded as", self.result_name_unnorm)
 
-    def train(self, sample=0):
+    def train(self):
         # prepare data
         print("Prepare training data")
         X_orig, y_orig = self.get_data()
@@ -120,11 +117,12 @@ class ml_unet:
         print(y_pred.shape)
         
         # Evaluation (MSE)
-        test_mse = np.mean((y_test - y_pred) ** 2)
+        #test_mse = np.mean((y_test - y_pred) ** 2)
+        test_mse = torch.mean((y_test - y_pred) ** 2)
         print(f"Test MSE: {test_mse:.4f}")
         
         # Inverse transform the predicted ECG to original scale
-        y_pred2 = normalize(y_pred,scaler1,"reverse")
+        y_pred2 = normalize(y_pred, scaler1, "reverse")
         
         # replace non blocked channels with original values
         y_pred3 = Xo_test.copy()
@@ -133,11 +131,11 @@ class ml_unet:
                 if all(value==0 for value in s_input[ch]):
                     s_input[ch] = s_pred[ch]
         
-        self.visualize([y_pred, y_pred3], [y_test, yo_test], [X_test, Xo_test], sample=sample)
+        self.visualize(out_ch, [y_pred, y_pred3], [y_test, yo_test], [X_test, Xo_test])
 
-    def test(self, sample=0):
+    def test(self):
         # prepare data
-        print("Prepare training data")
+        print("Prepare testing data")
         X_orig, y_orig = self.get_data()
         
         # normalize data
@@ -175,11 +173,12 @@ class ml_unet:
         print(y_pred.shape)
         
         # Evaluation (MSE)
-        test_mse = np.mean((y_norm - y_pred) ** 2)
+        #test_mse = np.mean((y_norm - y_pred) ** 2)
+        test_mse = torch.mean((y_norm - y_pred) ** 2)
         print(f"Test MSE: {test_mse:.4f}")
         
         # Inverse transform the predicted data to original scale
-        y_pred2 = normalize(y_pred,scaler1,"reverse")
+        y_pred2 = normalize(y_pred, scaler1, "reverse")
         
         # replace non blocked channels with original values
         y_pred3 = X_orig.copy()
@@ -189,8 +188,8 @@ class ml_unet:
                     s_input[ch] = s_pred[ch]
         
         # save un-normalized prediction as mat file
-        savemat(os.path.join(self.gen_path, self.gen_name[0]), {self.gen_name[1]:y_pred3})
-        print("generated data saved as", self.gen_name[0])
+        savemat(os.path.join(self.gen_path, self.gen_name), {self.label:y_pred3})
+        print("generated data saved as", self.gen_name)
         
-        self.visualize([y_pred, y_pred3], [y_norm, y_orig], [X_norm, X_orig], sample=sample)
+        self.visualize(out_ch, [y_pred, y_pred3], [y_norm, y_orig], [X_norm, X_orig])
 

@@ -6,7 +6,7 @@ import mne
 
 from .data_util import filter_data, SP_50
 
-class data_our:
+class data_nicu:
     def __init__(self, name, mat_path, raw_path):
         self.mat_path = mat_path
         self.raw_path = raw_path
@@ -69,8 +69,8 @@ class data_our:
             num_seizures = int(num_seizures_match.group(1)) if num_seizures_match else 0
             seizures = []
             for i in range(num_seizures):
-                start_match = re.search(rf'Seizure Start Time: (\d+) seconds', entry)
-                end_match = re.search(rf'Seizure End Time: (\d+) seconds', entry)
+                start_match = re.search(rf'Seizure_{i+1} Start Time: (\d+) seconds', entry)
+                end_match = re.search(rf'Seizure_{i+1} End Time: (\d+) seconds', entry)
                 if start_match and end_match:
                     seizures.append({
                         'start': int(start_match.group(1)),

@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import DataLoader, TensorDataset
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import KFold
 import numpy as np
 
