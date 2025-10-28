@@ -30,7 +30,44 @@ def filter_data(data, std_max, std_min):
                 sample[ch] = 0
     return data
 
-def SP_50(signal, fs):
+# check edf file sampling frequency
+def check_sfreq(file_path):
+    """Get sampling frequency from EDF file without loading data"""
+    try:
+        raw = mne.io.read_raw_edf(file_path, preload=False, verbose=False)
+        sfreq = raw.info['sfreq']
+        return sfreq
+    except Exception as e:
+        print(f"Error reading {file_path}: {e}")
+        return None
+
+# convert to fft
+def convert_fft(data, sampling_rate=500, return_magnitude=True):
+    """
+    Convert EDF data to FFT while maintaining shape (samples, channels, timesteps)
+    
+    Args:
+        data: numpy array of shape (samples, channels, timesteps)
+        sampling_rate: sampling frequency in Hz
+        return_magnitude: if True returns magnitude, if False returns complex FFT
+    
+    Returns:
+        FFT data with same shape as input
+    """
+    if len(data) == 0:
+        return data
+    
+    # Apply FFT along the timesteps dimension (axis=2)
+    fft_data = np.fft.fft(data, axis=2)
+    
+    if return_magnitude:
+        # Take magnitude and keep real values
+        fft_data = np.abs(fft_data)
+    
+    return fft_data
+
+# remove 50 Hz noise
+def SP_50(signal, fs=500):
     """
     Remove 50 Hz power line interference from signals using a notch filter.
     

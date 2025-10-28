@@ -4,24 +4,29 @@ import numpy as np
 from scipy.io import loadmat, savemat
 import mne
 
-from .data_util import filter_data, SP_50
+from .data_util import filter_data, convert_fft, SP_50
 
-class data_our:
-    def __init__(self, name, mat_path, raw_path):
+class data_raw:
+    def __init__(self, name, mat_path, raw_path, dataset="our"):
         self.mat_path = mat_path
         self.raw_path = raw_path
         self.label = "data"
         self.seiz_name = f"{name}_seizure_data.mat"
         self.nseiz_name = f"{name}_non_seizure_data.mat"
+        self.dataset = dataset
+        valid_dataset = ["our", "nicu"]
+        if dataset not in valid_dataset:
+            raise ValueError(f"Invalid dataset type: '{dataset}'. Must be one of: {valid_dataset}")
         self.config()
         self.file_limit(max_files=5)
 
-    def config(self, timesteps=500, step_size=500, std_min=1e-10, std_max=1e10, max_ch=None):
+    def config(self, max_ch=None, timesteps=500, step_size=500, std_min=1e-10, std_max=1e10, is_FFT=False):
+        self.max_ch = max_ch
         self.timesteps = timesteps
         self.step_size = step_size
         self.std_min = std_min
         self.std_max = std_max
-        self.max_ch = max_ch
+        self.is_FFT = is_FFT
 
     def file_limit(self, max_files=None, file_pattern=None, exclude_files=None):
         self.max_files = max_files
@@ -43,10 +48,17 @@ class data_our:
         print(f"Total non-seizure segments: {len(nseiz_data)}")
         
         # 50hz filter
-        if len(seiz_data) > 0:
-            seiz_data = SP_50(seiz_data, 500)
-        if len(nseiz_data) > 0:
-            nseiz_data = SP_50(nseiz_data, 500)
+        seiz_data = SP_50(seiz_data, sf=self.timesteps)
+        nseiz_data = SP_50(nseiz_data, sf=self.timesteps)
+        
+        # std filter
+        #seiz_data = filter_data(seiz_data, self.std_max, self.std_min)
+        #nseiz_data = filter_data(nseiz_data, self.std_max, self.std_min)
+        
+        # convert to FFT
+        if self.is_FFT:
+            seiz_data = convert_fft(seiz_data, sampling_rate=self.timesteps)
+            nseiz_data = convert_fft(nseiz_data, sampling_rate=self.timesteps)
         
         # save data
         print("saving data to mat")
@@ -69,8 +81,12 @@ class data_our:
             num_seizures = int(num_seizures_match.group(1)) if num_seizures_match else 0
             seizures = []
             for i in range(num_seizures):
-                start_match = re.search(rf'Seizure Start Time: (\d+) seconds', entry)
-                end_match = re.search(rf'Seizure End Time: (\d+) seconds', entry)
+                if self.dataset=="our":
+                    start_match = re.search(rf'Seizure Start Time: (\d+) seconds', entry)
+                    end_match = re.search(rf'Seizure End Time: (\d+) seconds', entry)
+                elif self.dataset=="nicu":
+                    start_match = re.search(rf'Seizure_{i+1} Start Time: (\d+) seconds', entry)
+                    end_match = re.search(rf'Seizure_{i+1} End Time: (\d+) seconds', entry)
                 if start_match and end_match:
                     seizures.append({
                         'start': int(start_match.group(1)),

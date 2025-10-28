@@ -1,8 +1,7 @@
 import os
 
 from scripts.data_mat import data_mat
-from scripts.data_our import data_our
-from scripts.data_nicu import data_nicu
+from scripts.data_raw import data_raw
 
 from scripts.ml_unet import ml_unet
 from scripts.ml_cnn import ml_cnn
@@ -54,12 +53,12 @@ def run_data(path_list, dataset, name):
     mat_path, our_path, nicu_path = path_list
     
     if dataset=="our":
-        our = data_our(name, mat_path, our_path)
+        our = data_raw(name, mat_path, our_path, dataset="our")
         #our.file_limit(file_pattern=r'eeg_0[1-9]\.edf|eeg_10\.edf')  # files 01-10
         our.file_limit(file_pattern=r'eeg_1[1-9]\.edf|eeg_20\.edf')  # files 11-20
         our.make_data()
     elif dataset=="nicu":
-        nicu = data_nicu(name, mat_path, nicu_path)
+        nicu = data_raw(name, mat_path, nicu_path, dataset="our")
         nicu.file_limit(file_pattern=r'eeg_0[1-9]\.edf|eeg_10\.edf')  # files 01-10
         #nicu.file_limit(file_pattern=r'eeg_1[1-9]\.edf|eeg_20\.edf')  # files 11-20
         nicu.make_data()
