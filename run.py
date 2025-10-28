@@ -58,7 +58,7 @@ def run_data(path_list, dataset, name):
         our.file_limit(file_pattern=r'eeg_1[1-9]\.edf|eeg_20\.edf')  # files 11-20
         our.make_data()
     elif dataset=="nicu":
-        nicu = data_raw(name, mat_path, nicu_path, dataset="our")
+        nicu = data_raw(name, mat_path, nicu_path, dataset="nicu")
         nicu.file_limit(file_pattern=r'eeg_0[1-9]\.edf|eeg_10\.edf')  # files 01-10
         #nicu.file_limit(file_pattern=r'eeg_1[1-9]\.edf|eeg_20\.edf')  # files 11-20
         nicu.make_data()

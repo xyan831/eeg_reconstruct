@@ -193,3 +193,57 @@ class ml_unet:
         
         self.visualize(out_ch, [y_pred, y_pred3], [y_norm, y_orig], [X_norm, X_orig])
 
+    def run(self, data_path):
+        # prepare data
+        print("Loading dataset")
+        data_orig = mat2numpy(data_path), self.label)
+        # crop timesteps to fit unet (divisible by 2^(num_encoder_layers) = 2^4 = 16)
+        print("Cropping data")
+        data_orig = crop_timestep(data_orig, 16)
+        
+        # normalize data
+        scaler1 = StandardScaler()
+        data_norm = normalize(data_orig, scaler1, "normal")
+        
+        # convert to tensor
+        data_norm = torch.tensor(data_norm, dtype=torch.float32)
+        
+        # prepare dataloader full dataset no split
+        data_loader = DataLoader(TensorDataset(data_norm), batch_size=32, shuffle=False, num_workers=0, pin_memory=True)
+        
+        # in channels out channels
+        in_ch = data_norm[0].shape[0]
+        out_ch = data_norm[0].shape[0]
+        print(f"in_channel = {in_ch}\nout_channel = {out_ch}")
+        
+        print("Data Prepare complete")
+        
+        # Initialize Model, Loss, Optimizer
+        #device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = UNet1D(in_channels=in_ch, out_channels=out_ch).to(device)
+        criterion = nn.MSELoss()  # For regression tasks
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
+        
+        # load pretrained model
+        state_dict = torch.load(os.path.join(self.model_path, self.model_name), weights_only=True)
+        model.load_state_dict(state_dict)
+        
+        # Get generated data
+        pred_data, _ = predict(device, model, data_loader)
+        print(pred_data.shape)
+        
+        # Inverse transform the predicted data to original scale
+        pred_data2 = normalize(pred_data, scaler1, "reverse")
+        
+        # replace non blocked channels with original values
+        pred_data2 = data_orig.copy()
+        for s_pred,s_input in zip(pred_data, pred_data2):
+            for ch in range(len(s_input)):
+                if all(value==0 for value in s_input[ch]):
+                    s_input[ch] = s_pred[ch]
+        
+        # save un-normalized prediction as mat file
+        savemat(os.path.join(self.gen_path, self.gen_name), {self.label:pred_data2})
+        print("generated data saved as", self.gen_name)
+
