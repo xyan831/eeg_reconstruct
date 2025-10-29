@@ -11,10 +11,12 @@ from sklearn.model_selection import train_test_split
 from .data_util import mat2numpy, crop_timestep
 from .model_util import normalize, torch_dataloader, train_model, predict
 #from .model_unet import UNet1D
-from .model_unet_att import UNet1D
+#from .model_unet_ch_att import UNet1D
+#from .model_unet_tm_att import UNet1D
+from .model_unet_fl_att import UNet1D
 from .visualize import save_pred_side
 
-class ml_unet:
+class reconstruct:
     def __init__(self, data_path, model_path, gen_path, visual_path, name, model):
         self.data_path = data_path
         self.model_path = model_path
@@ -113,7 +115,7 @@ class ml_unet:
         print("Model train complete, saved as", self.model_name)
         
         # Get predictions for test set
-        y_pred, bn_pred = predict(device, model, test_loader)
+        y_pred = predict(device, model, test_loader)
         print(y_pred.shape)
         
         # Evaluation (MSE)
@@ -169,7 +171,7 @@ class ml_unet:
         model.load_state_dict(state_dict)
         
         # Get generated data
-        y_pred, bn_pred = predict(device, model, full_loader)
+        y_pred = predict(device, model, full_loader)
         print(y_pred.shape)
         
         # Evaluation (MSE)
@@ -230,7 +232,7 @@ class ml_unet:
         model.load_state_dict(state_dict)
         
         # Get generated data
-        pred_data, _ = predict(device, model, data_loader)
+        pred_data = predict(device, model, data_loader)
         print(pred_data.shape)
         
         # Inverse transform the predicted data to original scale

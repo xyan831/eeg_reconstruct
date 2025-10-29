@@ -2,20 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-# plot bottleneck
-def plot_bottleneck(bn_pred, type="torch", sample=0):
-    plt.figure()
-    # plot for tensorflow
-    if type == "tensorflow":
-        for i in range(bn_pred.shape[1]):
-            plt.plot(y_test[sample, i, :])
-    # plot for torch
-    if type == "torch":
-        for i in range(bn_pred.shape[2]):
-            plt.plot(y_test[sample, :, i])
-    plt.title(f"Bottleneck [sample {sample}]")
-    plt.show()
-
 # compare pred and true for multi channel output
 def plot_pred_stack(y_pred, y_test, X_test, ch_list, sample=0):
     for i in ch_list:

@@ -59,7 +59,7 @@ def train_model(device, model, dataloader, criterion, optimizer, epochs=10):
             X_batch, y_batch = X_batch.to(device), y_batch.to(device)
 
             # Forward pass
-            outputs, _ = model(X_batch)
+            outputs = model(X_batch)
             loss = criterion(outputs, y_batch)
 
             # Backward pass
@@ -75,12 +75,10 @@ def train_model(device, model, dataloader, criterion, optimizer, epochs=10):
 def predict(device, model, dataloader):
     model.eval()
     y_pred = []
-    bn_pred = []
     with torch.no_grad():
         for X_batch, _ in dataloader:
             X_batch = X_batch.to(device)
-            y_out, bn_out = model(X_batch)
+            y_out = model(X_batch)
             y_pred.append(y_out.cpu().numpy())
-            bn_pred.append(bn_out.cpu().numpy())
-    return np.concatenate(y_pred, axis=0), np.concatenate(bn_pred, axis=0)
+    return np.concatenate(y_pred, axis=0)
 

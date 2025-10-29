@@ -43,7 +43,7 @@ class UNet1D(nn.Module):
         x = self.up3(x, x2)
         x = self.up4(x, x1)
 
-        return self.outc(x), x6
+        return self.outc(x)
 
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""

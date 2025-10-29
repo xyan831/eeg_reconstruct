@@ -3,8 +3,8 @@ import os
 from scripts.data_mat import data_mat
 from scripts.data_raw import data_raw
 
-from scripts.ml_unet import ml_unet
-from scripts.ml_cnn import ml_cnn
+from scripts.reconstruct import reconstruct
+from scripts.classification import classification
 
 def run_cnn(path_list, run_type, name, model):
     # get folder paths
@@ -18,7 +18,7 @@ def run_cnn(path_list, run_type, name, model):
         print("invalid run type")
     
     model_path = os.path.join(model_path, f'{model}_best_cnn.pth')
-    cnn1 = ml_cnn(data_path, model_path, name)
+    cnn1 = classification(data_path, model_path, name)
     
     if run_type=="train":
         cnn1.train()
@@ -30,7 +30,7 @@ def run_cnn(path_list, run_type, name, model):
 def run_unet(path_list, run_type, name, model, epoch_num, data_type, sample):
     data_path, model_path, gen_path, visual_path = path_list
     
-    unet1 = ml_unet(data_path, model_path, gen_path, visual_path, name, model)
+    unet1 = reconstruct(data_path, model_path, gen_path, visual_path, name, model)
     unet1.config(data_type=data_type, epoch_num=epoch_num, sample=sample)
     
     if run_type=="train":    # train model
@@ -48,19 +48,36 @@ def run_mat(path_list, name, ch_max, block_ch, data_type, mask_type):
     mat.config(data_type=data_type, ch_max=ch_max, block_ch=block_ch, mask_type=mask_type)
     mat.make_data()
     
-def run_data(path_list, dataset, name):
+def run_data(path_list, dataset, name, isFFT=False):
     # get folder paths
     mat_path, our_path, nicu_path = path_list
     
     if dataset=="our":
         our = data_raw(name, mat_path, our_path, dataset="our")
-        #our.file_limit(file_pattern=r'eeg_0[1-9]\.edf|eeg_10\.edf')  # files 01-10
+        our.config(max_ch=26, timesteps=500, step_size=500, std_min=1e-10, std_max=1e10, is_FFT=isFFT)
+        our.file_limit(file_pattern=r'eeg_0[1-9]\.edf|eeg_10\.edf')  # files 01-10
+        our.make_data()
+    elif dataset=="nicu":
+        nicu = data_raw(name, mat_path, nicu_path, dataset="nicu")
+        nicu.config(max_ch=20, timesteps=500, step_size=500, std_min=1e-10, std_max=1e10, is_FFT=isFFT)
+        nicu.file_limit(file_pattern=r'eeg_0[1-9]\.edf|eeg_10\.edf')  # files 01-10
+        nicu.make_data()
+    else:
+        print("invalid data type")
+
+def run_data2(path_list, dataset, name, isFFT=False):
+    # get folder paths
+    mat_path, our_path, nicu_path = path_list
+    
+    if dataset=="our":
+        our = data_raw(name, mat_path, our_path, dataset="our")
+        our.config(max_ch=26, timesteps=500, step_size=500, std_min=1e-10, std_max=1e10, is_FFT=isFFT)
         our.file_limit(file_pattern=r'eeg_1[1-9]\.edf|eeg_20\.edf')  # files 11-20
         our.make_data()
     elif dataset=="nicu":
         nicu = data_raw(name, mat_path, nicu_path, dataset="nicu")
-        nicu.file_limit(file_pattern=r'eeg_0[1-9]\.edf|eeg_10\.edf')  # files 01-10
-        #nicu.file_limit(file_pattern=r'eeg_1[1-9]\.edf|eeg_20\.edf')  # files 11-20
+        nicu.config(max_ch=21, timesteps=500, step_size=500, std_min=1e-10, std_max=1e10, is_FFT=isFFT)
+        nicu.file_limit(file_pattern=r'eeg_1[1-9]\.edf|eeg_20\.edf')  # files 11-20
         nicu.make_data()
     else:
         print("invalid data type")
@@ -81,8 +98,10 @@ if __name__ == "__main__":
     
     # prepare rawdata
     path_list = [mat_path, our_path, nicu_path]
-    #run_data(path_list, "our", "ourNM2")
-    #run_data(path_list, "nicu", "nicuNM1")
+    #run_data(path_list, "our", "ourNM1", isFFT=False)
+    #run_data(path_list, "nicu", "nicuNM1", isFFT=False)
+    #run_data2(path_list, "our", "ourNM2", isFFT=False)
+    #run_data2(path_list, "nicu", "nicuNM2", isFFT=False)
 
     # prepare dataset
     path_list = [mat_path, data_path]
@@ -93,8 +112,8 @@ if __name__ == "__main__":
     # reconstruction model training/testing
     path_list = [data_path, model_path, gen_path, visual_path]
     #run_unet(path_list, "train", "ourNM1", "ourNM1", epoch_num, "both", sample=0)
-    run_unet(path_list, "test", "ourNM2", "ourNM1", epoch_num, "seiz", sample=0)
-    run_unet(path_list, "test", "ourNM2", "ourNM1", epoch_num, "nseiz", sample=0)
+    #run_unet(path_list, "test", "ourNM2", "ourNM1", epoch_num, "seiz", sample=0)
+    #run_unet(path_list, "test", "ourNM2", "ourNM1", epoch_num, "nseiz", sample=0)
     
     # classification
     path_list = [model_path, mat_path, gen_path]

@@ -11,7 +11,7 @@ from .data_util import mat2numpy
 from .model_util import get_datalabel, kfold_split, torch_dataloader
 from .model_cnn import CNN
 
-class ml_cnn:
+class classification:
     def __init__(self, data_path, model_path, prefix):
         self.data_path = data_path
         self.model_path = model_path

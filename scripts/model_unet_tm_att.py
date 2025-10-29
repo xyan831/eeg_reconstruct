@@ -7,7 +7,7 @@ import numpy as np
 # U-net Model Definition
 # ----------------------
 
-# Full UNet1D with Attention
+# Full UNet1D with Temporal Attention
 class UNet1D(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(UNet1D, self).__init__()
@@ -40,20 +40,20 @@ class UNet1D(nn.Module):
         x = self.up3(x, x2)
         x = self.up4(x, x1)
 
-        return self.outc(x), x6
+        return self.outc(x)
 
-# Attention Block: Channel + Temporal
+# Attention Block: Temporal
 class AttentionBlock1D(nn.Module):
     def __init__(self, channels, reduction=16):
         super(AttentionBlock1D, self).__init__()
         # Channel Attention
-        self.avg_pool = nn.AdaptiveAvgPool1d(1)
-        self.fc = nn.Sequential(
-            nn.Conv1d(channels, channels // reduction, 1, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Conv1d(channels // reduction, channels, 1, bias=False),
-            nn.Sigmoid()
-        )
+        #self.avg_pool = nn.AdaptiveAvgPool1d(1)
+        #self.fc = nn.Sequential(
+            #nn.Conv1d(channels, channels // reduction, 1, bias=False),
+            #nn.ReLU(inplace=True),
+            #nn.Conv1d(channels // reduction, channels, 1, bias=False),
+            #nn.Sigmoid()
+        #)
         # Temporal Attention
         self.conv_temporal = nn.Sequential(
             nn.Conv1d(channels, channels, kernel_size=7, padding=3, groups=channels),
@@ -62,8 +62,8 @@ class AttentionBlock1D(nn.Module):
 
     def forward(self, x):
         # Channel-wise
-        ca = self.fc(self.avg_pool(x))
-        x = x * ca
+        #ca = self.fc(self.avg_pool(x))
+        #x = x * ca
         # Temporal-wise
         ta = self.conv_temporal(x)
         x = x * ta

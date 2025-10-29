@@ -13,10 +13,12 @@ class data_raw:
         self.label = "data"
         self.seiz_name = f"{name}_seizure_data.mat"
         self.nseiz_name = f"{name}_non_seizure_data.mat"
+        
         self.dataset = dataset
         valid_dataset = ["our", "nicu"]
         if dataset not in valid_dataset:
             raise ValueError(f"Invalid dataset type: '{dataset}'. Must be one of: {valid_dataset}")
+        
         self.config()
         self.file_limit(max_files=5)
 
