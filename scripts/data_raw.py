@@ -11,16 +11,13 @@ class data_raw:
         self.mat_path = mat_path
         self.raw_path = raw_path
         self.label = "data"
-        self.seiz_name = f"{name}_seizure_data.mat"
-        self.nseiz_name = f"{name}_non_seizure_data.mat"
-        
         self.dataset = dataset
         valid_dataset = ["our", "nicu"]
         if dataset not in valid_dataset:
             raise ValueError(f"Invalid dataset type: '{dataset}'. Must be one of: {valid_dataset}")
         
         self.config()
-        self.file_limit(max_files=5)
+        self.file_config(name, max_files=5)
 
     def config(self, max_ch=None, timesteps=500, step_size=500, std_min=1e-10, std_max=1e10, is_FFT=False):
         self.max_ch = max_ch
@@ -30,7 +27,9 @@ class data_raw:
         self.std_max = std_max
         self.is_FFT = is_FFT
 
-    def file_limit(self, max_files=None, file_pattern=None, exclude_files=None):
+    def file_config(self, name, max_files=None, file_pattern=None, exclude_files=None):
+        self.seiz_name = f"{name}_seizure_data.mat"
+        self.nseiz_name = f"{name}_non_seizure_data.mat"
         self.max_files = max_files
         self.file_pattern = file_pattern
         self.exclude_files = exclude_files or []
@@ -50,14 +49,14 @@ class data_raw:
         print(f"Total non-seizure segments: {len(nseiz_data)}")
         
         # 50hz filter
-        seiz_data = SP_50(seiz_data, sf=self.timesteps)
-        nseiz_data = SP_50(nseiz_data, sf=self.timesteps)
+        seiz_data = SP_50(seiz_data, fs=self.timesteps)
+        nseiz_data = SP_50(nseiz_data, fs=self.timesteps)
         
         # std filter
         #seiz_data = filter_data(seiz_data, self.std_max, self.std_min)
         #nseiz_data = filter_data(nseiz_data, self.std_max, self.std_min)
         
-        # convert to FFT
+        # convert to FFT (fft -> ifft)
         if self.is_FFT:
             seiz_data = convert_fft(seiz_data, sampling_rate=self.timesteps)
             nseiz_data = convert_fft(nseiz_data, sampling_rate=self.timesteps)

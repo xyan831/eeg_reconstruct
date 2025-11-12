@@ -19,8 +19,8 @@ class classification:
         self.nseiz_path = os.path.join(data_path, f"{prefix}_non_seizure_data.mat")
 
     def get_data(self):
-        seiz_data = mat2numpy(self.seiz_path, "seizure_data")
-        nseiz_data = mat2numpy(self.nseiz_path, "non_seizure_data")
+        seiz_data = mat2numpy(self.seiz_path, "data")
+        nseiz_data = mat2numpy(self.nseiz_path, "data")
         
         full_data = np.concatenate((seiz_data, nseiz_data), axis=0)
         full_label = get_datalabel(seiz_data, nseiz_data)

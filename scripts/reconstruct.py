@@ -198,7 +198,7 @@ class reconstruct:
     def run(self, data_path):
         # prepare data
         print("Loading dataset")
-        data_orig = mat2numpy(data_path), self.label)
+        data_orig = mat2numpy(data_path, self.label)
         # crop timesteps to fit unet (divisible by 2^(num_encoder_layers) = 2^4 = 16)
         print("Cropping data")
         data_orig = crop_timestep(data_orig, 16)

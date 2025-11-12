@@ -9,33 +9,39 @@ class data_mat:
     def __init__(self, name, mat_path, data_path):
         self.mat_path = mat_path
         self.data_path = data_path
-        self.name = name
         self.label = "data"
-        self.seiz_name = f"{name}_seizure_data.mat"
-        self.nseiz_name = f"{name}_non_seizure_data.mat"
         self.config()
+        self.file_config(name, namelist=[name])
 
     def config(self, data_type="both", ch_max=4, block_ch=[1,2,3,4], mask_type="random"):
         self.data_type = data_type
         self.ch_max = ch_max
         self.block_ch = block_ch
         self.mask_type = mask_type
-        self.norm_name = f"{self.name}_norm_{data_type}.mat"
-        self.mask_name = f"{self.name}_mask_{data_type}.mat"
+
+    def file_config(self, name, namelist=[]):
+        self.norm_name = f"{name}_norm_{self.data_type}.mat"
+        self.mask_name = f"{name}_mask_{self.data_type}.mat"
+        seizlist = [f"{name}_seizure_data.mat" for name in namelist]
+        nseizlist = [f"{name}_non_seizure_data.mat" for name in namelist]
+        if self.data_type=="seiz":
+            self.filelist = seizlist
+        elif self.data_type=="nseiz":
+            self.filelist = nseizlist
+        else:
+            self.filelist = seizlist + nseizlist
 
     def make_data(self):
         print("start make data")
         
         # load rawdata
-        if self.data_type=="seiz":
-            data_orig = mat2numpy(os.path.join(self.mat_path, self.seiz_name), self.label)
-        elif self.data_type=="nseiz":
-            data_orig = mat2numpy(os.path.join(self.mat_path, self.nseiz_name), self.label)
-        else:
-            # load multiple rawdata and combine
-            data_seiz = mat2numpy(os.path.join(self.mat_path, self.seiz_name), self.label)
-            data_nseiz = mat2numpy(os.path.join(self.mat_path, self.nseiz_name), self.label)
-            data_orig = np.concatenate((data_seiz, data_nseiz), axis=0)
+        datalist = []
+        debug = []
+        for filename in self.filelist:
+            filedata = mat2numpy(os.path.join(self.mat_path, filename), self.label)
+            if filedata.shape!=(0, 0):
+                datalist.append(filedata)
+        data_orig = np.concatenate(datalist)
         
         print(data_orig.shape)
         
