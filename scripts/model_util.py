@@ -55,7 +55,7 @@ def torch_dataloader(X_data, y_data, batch_size=32, datatype="test"):
 def train_model(device, model, dataloader, criterion, optimizer, epochs=10, results_file="results.txt"):
     # Create results file with header
     with open(results_file, "w") as f:
-        f.write("epoch,running_loss\n")
+        f.write("epoch,loss\n")
     model.train()
     for epoch in range(epochs):
         running_loss = 0.0
@@ -75,7 +75,7 @@ def train_model(device, model, dataloader, criterion, optimizer, epochs=10, resu
         
         # Log results to file
         with open(results_file, "a") as f:
-            f.write("{},{:.4f}\n".format(epoch+1, running_loss))
+            f.write("{},{:.4f}\n".format(epoch+1, running_loss/len(dataloader)))
         print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss/len(dataloader):.4f}")
 
 # Prediction/Inference

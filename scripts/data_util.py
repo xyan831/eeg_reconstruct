@@ -41,30 +41,37 @@ def check_sfreq(file_path):
         print(f"Error reading {file_path}: {e}")
         return None
 
-# convert to fft
-def convert_fft(data, sampling_rate=500, return_magnitude=True):
+def convert_fft(data, sampling_rate=500, return_magnitude=True, inverse=False):
     """
-    Convert EDF data to FFT while maintaining shape (samples, channels, timesteps)
+    Convert EDF data to FFT or perform inverse FFT while maintaining shape (samples, channels, timesteps)
     
     Args:
         data: numpy array of shape (samples, channels, timesteps)
         sampling_rate: sampling frequency in Hz
         return_magnitude: if True returns magnitude, if False returns complex FFT
+        inverse: if True, performs inverse FFT instead of forward FFT
     
     Returns:
-        FFT data with same shape as input
+        Transformed data with same shape as input
     """
     if len(data) == 0:
         return data
-    
-    # Apply FFT along the timesteps dimension (axis=2)
-    fft_data = np.fft.fft(data, axis=2)
-    
-    if return_magnitude:
-        # Take magnitude and keep real values
-        fft_data = np.abs(fft_data)
-    
-    return fft_data
+
+    if not inverse:
+        # Forward FFT
+        fft_data = np.fft.fft(data, axis=2)
+        if return_magnitude:
+            fft_data = np.abs(fft_data)
+        return fft_data
+    else:
+        # Inverse FFT
+        if np.iscomplexobj(data):
+            ifft_data = np.fft.ifft(data, axis=2)
+        else:
+            # If magnitude-only data was passed, warn that phase is lost
+            raise ValueError("Cannot invert magnitude-only FFT - phase information is lost.")
+        # Return real signal (since EDF data is typically real)
+        return np.real(ifft_data)
 
 # remove 50 Hz noise
 def SP_50(signal, fs=500):

@@ -9,7 +9,7 @@ import torch.optim as optim
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 
-from .data_util import mat2numpy, crop_timestep
+from .data_util import mat2numpy, crop_timestep, convert_fft
 from .model_util import normalize, torch_dataloader, train_model, predict
 #from .model_unet import UNet1D
 #from .model_unet_ch_att import UNet1D
@@ -29,7 +29,7 @@ class reconstruct:
         self.label = "data"
         self.config()
 
-    def config(self, data_type="both", epoch_num=10, sample=0):
+    def config(self, data_type="both", epoch_num=10, isFFT=False, sample=0):
         self.model_name = f"{self.model}_e{epoch_num}_unet.pth"
         self.norm_name = f"{self.name}_norm_{data_type}.mat"
         self.mask_name = f"{self.name}_mask_{data_type}.mat"
@@ -43,8 +43,11 @@ class reconstruct:
         self.sample = sample
         self.result_name_norm = f"{self.name}{data_type}_e{epoch_num}_unet_norm_s{sample}.pdf"
         self.result_name_unnorm = f"{self.name}{data_type}_e{epoch_num}_unet_unnorm_s{sample}.pdf"
+        self.isFFT = isFFT
+
+    def get_logname(self):
         now = datetime.now()
-        self.log_name = f"{self.model}_{now.strftime('%Y%m%d_%H%M%S')}.txt"
+        return f"{self.model}_{now.strftime('%Y%m%d_%H%M%S')}.txt"
 
     def get_data(self):
         # load normal and masked data
@@ -56,7 +59,7 @@ class reconstruct:
         crop_orig = crop_timestep(data_orig, 16)
         crop_mask = crop_timestep(data_mask, 16)
         #print(crop_norm.shape, crop_mask.shape)
-        print("Data cropped")        
+        print("Dataset ok")
         return crop_mask, crop_orig
 
     def visualize(self, out_ch, y_pred, y_test, X_test):
@@ -72,9 +75,18 @@ class reconstruct:
         print("un_normalized results recorded as", self.result_name_unnorm)
 
     def train(self):
+        # get log file name
+        log_name = self.get_logname()
+        results_file = os.path.join(self.log_path, log_name)
+        
         # prepare data
         print("Prepare training data")
         X_orig, y_orig = self.get_data()
+        
+        # Apply FFT along the timesteps dimension (axis=2)
+        if self.isFFT==True:
+            X_orig = convert_fft(X_orig, sampling_rate=500, return_magnitude=True, inverse=False)
+            y_orig = convert_fft(y_orig, sampling_rate=500, return_magnitude=True, inverse=False)
         
         # Split the data into training and testing sets
         Xo_train, Xo_test, yo_train, yo_test = train_test_split(X_orig, y_orig, test_size=0.2, random_state=42)
@@ -114,11 +126,11 @@ class reconstruct:
         
         # Train and save model
         print("Training model")
-        results_file = os.path.join(self.log_path, self.log_name)
         train_model(device, model, train_loader, criterion, optimizer, epochs=self.epoch_num, results_file=results_file)
         
         torch.save(model.state_dict(), os.path.join(self.model_path, self.model_name))
         print("Model train complete, saved as", self.model_name)
+        print("Results logged in", log_name)
         
         # Get predictions for test set
         y_pred = predict(device, model, test_loader)
@@ -129,11 +141,14 @@ class reconstruct:
         test_mse = torch.mean((y_test - y_pred) ** 2)
         print(f"Test MSE: {test_mse:.4f}")
         # Log results to file
-        with open(results_file, "a") as f:
-            f.write(f"Test MSE: {test_mse:.4f}")
+        #with open(results_file, "a") as f:
+        #    f.write(f"Test MSE: {test_mse:.4f}")
         
         # Inverse transform the predicted ECG to original scale
         y_pred2 = normalize(y_pred, scaler1, "reverse")
+        
+        # Inverse fft predicted ECG
+        #y_pred2 = np.fft.ifft(y_pred2, axis=2)
         
         # replace non blocked channels with original values
         y_pred3 = Xo_test.copy()
@@ -148,6 +163,11 @@ class reconstruct:
         # prepare data
         print("Prepare testing data")
         X_orig, y_orig = self.get_data()
+        
+        # Apply FFT along the timesteps dimension (axis=2)
+        if self.isFFT==True:
+            X_orig = convert_fft(X_orig, sampling_rate=500, return_magnitude=True, inverse=False)
+            y_orig = convert_fft(y_orig, sampling_rate=500, return_magnitude=True, inverse=False)
         
         # normalize data
         scaler1 = StandardScaler()
@@ -191,6 +211,9 @@ class reconstruct:
         # Inverse transform the predicted data to original scale
         y_pred2 = normalize(y_pred, scaler1, "reverse")
         
+        # Inverse fft predicted ECG
+        #y_pred2 = np.fft.ifft(y_pred2, axis=2)
+        
         # replace non blocked channels with original values
         y_pred3 = X_orig.copy()
         for s_pred,s_input in zip(y_pred2, y_pred3):
@@ -211,6 +234,10 @@ class reconstruct:
         # crop timesteps to fit unet (divisible by 2^(num_encoder_layers) = 2^4 = 16)
         print("Cropping data")
         data_orig = crop_timestep(data_orig, 16)
+        
+        # Apply FFT along the timesteps dimension (axis=2)
+        if self.isFFT==True:
+            data_orig = convert_fft(data_orig, sampling_rate=500, return_magnitude=True, inverse=False)
         
         # normalize data
         scaler1 = StandardScaler()
@@ -246,6 +273,9 @@ class reconstruct:
         
         # Inverse transform the predicted data to original scale
         pred_data2 = normalize(pred_data, scaler1, "reverse")
+        
+        # Inverse fft predicted ECG
+        #pred_data2 = np.fft.ifft(pred_data2, axis=2)
         
         # replace non blocked channels with original values
         pred_data2 = data_orig.copy()

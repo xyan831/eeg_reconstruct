@@ -4,7 +4,7 @@ import numpy as np
 from scipy.io import loadmat, savemat
 import mne
 
-from .data_util import filter_data, convert_fft, SP_50
+from .data_util import filter_data, SP_50
 
 class data_raw:
     def __init__(self, name, mat_path, raw_path, dataset="our"):
@@ -19,13 +19,12 @@ class data_raw:
         self.config()
         self.file_config(name, max_files=5)
 
-    def config(self, max_ch=None, timesteps=500, step_size=500, std_min=1e-10, std_max=1e10, is_FFT=False):
+    def config(self, max_ch=None, timesteps=500, step_size=500, std_min=1e-10, std_max=1e10):
         self.max_ch = max_ch
         self.timesteps = timesteps
         self.step_size = step_size
         self.std_min = std_min
         self.std_max = std_max
-        self.is_FFT = is_FFT
 
     def file_config(self, name, max_files=None, file_pattern=None, exclude_files=None):
         self.seiz_name = f"{name}_seizure_data.mat"
@@ -55,11 +54,6 @@ class data_raw:
         # std filter
         #seiz_data = filter_data(seiz_data, self.std_max, self.std_min)
         #nseiz_data = filter_data(nseiz_data, self.std_max, self.std_min)
-        
-        # convert to FFT (fft -> ifft)
-        if self.is_FFT:
-            seiz_data = convert_fft(seiz_data, sampling_rate=self.timesteps)
-            nseiz_data = convert_fft(nseiz_data, sampling_rate=self.timesteps)
         
         # save data
         print("saving data to mat")
