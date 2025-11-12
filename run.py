@@ -65,9 +65,9 @@ def run_mat(path_list, name, listname, ch_max, block_ch, data_type, mask_type):
     mat.make_data()
 
 def run_unet(path_list, run_type, name, model, epoch_num, data_type, sample):
-    data_path, model_path, gen_path, visual_path = path_list
+    data_path, model_path, log_path, gen_path, visual_path = path_list
     
-    unet1 = reconstruct(data_path, model_path, gen_path, visual_path, name, model)
+    unet1 = reconstruct(data_path, model_path, log_path, gen_path, visual_path, name, model)
     unet1.config(data_type=data_type, epoch_num=epoch_num, sample=sample)
     
     if run_type=="train":    # train model
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     #run_mat(path_list, f"our{name}02", f"our{name}", ch_max, block_ch, "nseiz", "random")
     
     # reconstruction model training/testing (80/20)
-    path_list = [data_path, model_path, gen_path, visual_path]
+    path_list = [data_path, model_path, log_path, gen_path, visual_path]
     run_unet(path_list, "train", f"our{name}01", f"our{name}1", epoch_num, "both", sample=0)
     #run_unet(path_list, "test", f"our{name}02", f"our{name}1", epoch_num, "seiz", sample=0)
     #run_unet(path_list, "test", f"our{name}02", f"our{name}1", epoch_num, "nseiz", sample=0)

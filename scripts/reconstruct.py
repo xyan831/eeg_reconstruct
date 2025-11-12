@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from scipy.io import savemat
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -17,9 +18,10 @@ from .model_unet_fl_att import UNet1D
 from .visualize import save_pred_side
 
 class reconstruct:
-    def __init__(self, data_path, model_path, gen_path, visual_path, name, model):
+    def __init__(self, data_path, model_path, log_path, gen_path, visual_path, name, model):
         self.data_path = data_path
         self.model_path = model_path
+        self.log_path = log_path
         self.gen_path = gen_path
         self.visual_path = visual_path
         self.name = name
@@ -41,6 +43,8 @@ class reconstruct:
         self.sample = sample
         self.result_name_norm = f"{self.name}{data_type}_e{epoch_num}_unet_norm_s{sample}.pdf"
         self.result_name_unnorm = f"{self.name}{data_type}_e{epoch_num}_unet_unnorm_s{sample}.pdf"
+        now = datetime.now()
+        self.log_name = f"{self.model}_{now.strftime('%Y%m%d_%H%M%S')}.txt"
 
     def get_data(self):
         # load normal and masked data
@@ -110,7 +114,9 @@ class reconstruct:
         
         # Train and save model
         print("Training model")
-        train_model(device, model, train_loader, criterion, optimizer, epochs=self.epoch_num)
+        results_file = os.path.join(self.log_path, self.log_name)
+        train_model(device, model, train_loader, criterion, optimizer, epochs=self.epoch_num, results_file=results_file)
+        
         torch.save(model.state_dict(), os.path.join(self.model_path, self.model_name))
         print("Model train complete, saved as", self.model_name)
         
@@ -122,6 +128,9 @@ class reconstruct:
         #test_mse = np.mean((y_test - y_pred) ** 2)
         test_mse = torch.mean((y_test - y_pred) ** 2)
         print(f"Test MSE: {test_mse:.4f}")
+        # Log results to file
+        with open(results_file, "a") as f:
+            f.write(f"Test MSE: {test_mse:.4f}")
         
         # Inverse transform the predicted ECG to original scale
         y_pred2 = normalize(y_pred, scaler1, "reverse")

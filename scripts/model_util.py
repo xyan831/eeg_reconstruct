@@ -52,7 +52,10 @@ def torch_dataloader(X_data, y_data, batch_size=32, datatype="test"):
 # ----------------------
 
 # Training Loop
-def train_model(device, model, dataloader, criterion, optimizer, epochs=10):
+def train_model(device, model, dataloader, criterion, optimizer, epochs=10, results_file="results.txt"):
+    # Create results file with header
+    with open(results_file, "w") as f:
+        f.write("epoch,running_loss\n")
     model.train()
     for epoch in range(epochs):
         running_loss = 0.0
@@ -69,86 +72,11 @@ def train_model(device, model, dataloader, criterion, optimizer, epochs=10):
             optimizer.step()
 
             running_loss += loss.item()
-
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss/len(dataloader):.4f}")
-
-def train_model2(device, model, train_loader, val_loader, criterion, optimizer,
-                epochs=10, results_file="results.txt"):
-
-    # Create results file with header
-    with open(results_file, "w") as f:
-        f.write("epoch,train_loss,train_acc,val_loss,val_acc,val_sen,val_spe,val_f1\n")
-
-    best_val_f1 = 0.0
-
-    for epoch in range(epochs):
-        model.train()
-        running_loss = 0.0
-        all_preds, all_labels = [], []
-
-        for X_batch, y_batch in train_loader:
-            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-
-            # Forward pass
-            outputs = model(X_batch)
-            loss = criterion(outputs, y_batch)
-
-            # Backprop
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            running_loss += loss.item()
-            preds = torch.argmax(outputs, dim=1)
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(y_batch.cpu().numpy())
-
-        # Training metrics
-        train_loss = running_loss / len(train_loader)
-        train_acc = accuracy_score(all_labels, all_preds)
-
-        # Validation
-        val_loss, val_acc, val_sen, val_spe, val_f1 = evaluate(model, val_loader, device, criterion)
-
-        # Save best model (optional)
-        if val_f1 > best_val_f1:
-            best_val_f1 = val_f1
-            torch.save(model.state_dict(), f"best_model_epoch_{epoch+1}.pth")
-
+        
         # Log results to file
         with open(results_file, "a") as f:
-            f.write("{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}\n".format(
-                epoch+1, train_loss, train_acc, val_loss, val_acc, val_sen, val_spe, val_f1
-            ))
-
-        print(f"Epoch {epoch+1}/{epochs} | Train Loss: {train_loss:.4f}, Acc: {train_acc:.4f} | "
-              f"Val Loss: {val_loss:.4f}, Acc: {val_acc:.4f}, F1: {val_f1:.4f}")
-
-# evaluate model
-def evaluate(model, dataloader, device, criterion):
-    model.eval()
-    val_loss = 0.0
-    all_preds, all_labels = [], []
-
-    with torch.no_grad():
-        for X_batch, y_batch in dataloader:
-            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-            outputs = model(X_batch)
-            loss = criterion(outputs, y_batch)
-            val_loss += loss.item()
-
-            preds = torch.argmax(outputs, dim=1)
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(y_batch.cpu().numpy())
-
-    # Compute metrics
-    val_acc = accuracy_score(all_labels, all_preds)
-    val_f1 = f1_score(all_labels, all_preds, average="binary")
-    val_sen = recall_score(all_labels, all_preds, pos_label=1)  # Sensitivity = Recall (for positive class)
-    tn, fp, fn, tp = confusion_matrix(all_labels, all_preds).ravel()
-    val_spe = tn / (tn + fp)
-
-    return val_loss / len(dataloader), val_acc, val_sen, val_spe, val_f1
+            f.write("{},{:.4f}\n".format(epoch+1, running_loss))
+        print(f"Epoch {epoch+1}/{epochs}, Loss: {running_loss/len(dataloader):.4f}")
 
 # Prediction/Inference
 def predict(device, model, dataloader):
