@@ -13,6 +13,7 @@
     - ``data_mat/``: .mat files. 500 timestep samples from .edf rawdata
     - ``data_train/``: .mat files. masked data used for training/testing model
     - ``model/``: .pth files. trained model files
+    - ``log/``: .txt files. record of training/validation results
     - ``visual/``: .pdf files. visual comparison of reconstructed data from ground truth
 - ``/scripts``: python scripts
     - ``classification.py``: seizure classification script
