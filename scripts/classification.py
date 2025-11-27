@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from scipy.io import loadmat
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -10,17 +11,65 @@ from torch.utils.data import DataLoader, TensorDataset
 from .data_util import mat2numpy
 from .model_util import get_datalabel, kfold_split, torch_dataloader
 from .model_cnn import CNN
+from .model_cnn_lstm import CNN_LSTM
+from .model_transformer import EEGTransformerClassifier
 
 class classification:
-    def __init__(self, data_path, model_path, prefix):
+    def __init__(self, data_path, model_path, log_path, name, model, model_type="cnn", num_epochs=10):
         self.data_path = data_path
         self.model_path = model_path
-        self.seiz_path = os.path.join(data_path, f"{prefix}_seizure_data.mat")
-        self.nseiz_path = os.path.join(data_path, f"{prefix}_non_seizure_data.mat")
+        self.log_path = log_path
+        self.num_epochs = num_epochs
+        self.model_type = model_type
+        self.model_name = f"{model}_class_{model_type}.pth"
+        self.log_name = f"{model}_class_{model_type}"
+        self.seiz_name = f"{name}_seizure_data.mat"
+        self.nseiz_name = f"{name}_non_seizure_data.mat"
+        self.name = name
+
+    def get_logname(self):
+        now = datetime.now()
+        return f"{self.log_name}_{now.strftime('%Y%m%d_%H%M%S')}.txt"
+
+    def get_model(self, num_classes, load_pretrain=False):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if self.model_type=="cnn":
+            model = CNN(num_classes=num_classes).to(device)
+        elif self.model_type=="lstm":
+            model = CNN_LSTM(num_classes=num_classes).to(device)
+        elif self.model_type=="transformer":
+            if "our" in self.name:
+                num_channels = 26
+            elif "nicu" in self.name:
+                num_channels = 21
+            else:
+                num_channels = 21
+            model = EEGTransformerClassifier(
+                num_classes=num_classes,
+                num_channels=num_channels,      # Your EEG has 26 channels
+                signal_len=496,       # Your EEG sequence length
+                patch_size=16,        # You can adjust this
+                embed_dim=128,        # Embedding dimension
+                depth=6,              # Number of transformer blocks
+                num_heads=4,          # Number of attention heads
+                mlp_ratio=4.0,        # MLP expansion ratio
+                drop_rate=0.1,        # Dropout rate
+                attn_drop_rate=0.1,   # Attention dropout rate
+                drop_path_rate=0.1    # Stochastic depth rate
+            ).to(device)
+        else:
+            raise ValueError(f"Invalid model type {self.model_type}")
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        if load_pretrain==True:
+            model_file = os.path.join(self.model_path, self.model_name)
+            state_dict = torch.load(model_file, map_location=device, weights_only=True)
+            model.load_state_dict(state_dict)
+        return device, model, criterion, optimizer
 
     def get_data(self):
-        seiz_data = mat2numpy(self.seiz_path, "data")
-        nseiz_data = mat2numpy(self.nseiz_path, "data")
+        seiz_data = mat2numpy(os.path.join(self.data_path, self.seiz_name), "data")
+        nseiz_data = mat2numpy(os.path.join(self.data_path, self.nseiz_name), "data")
         
         full_data = np.concatenate((seiz_data, nseiz_data), axis=0)
         full_label = get_datalabel(seiz_data, nseiz_data)
@@ -50,18 +99,18 @@ class classification:
         return trainloader, testloader, num_classes
 
     def train(self):
+        # create results file for log
+        log_name = self.get_logname()
+        results_file = os.path.join(self.log_path, log_name)
+        # Create results file with header
+        with open(results_file, "w") as f:
+            f.write("epoch,train_loss,val_acc\n")
+        
+        # get data
         trainloader, testloader, num_classes = self.get_data()
-        
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model = CNN(num_classes=num_classes).to(device)
-        
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-        criterion = nn.CrossEntropyLoss()
-        
+        device, model, criterion, optimizer = self.get_model(num_classes, load_pretrain=False)
         best_accuracy = 0.0
-        
-        num_epochs = 10
-        for epoch in range(num_epochs):
+        for epoch in range(self.num_epochs):
             model.train()
             running_loss = 0.0
             for X, y in trainloader:
@@ -91,23 +140,22 @@ class classification:
             accuracy = 100 * correct / total
             print(f"Validation Accuracy: {accuracy:.2f}%")
             
+            # Log results to file
+            with open(results_file, "a") as f:
+                f.write("{},{:.4f},{:.4f}\n".format(epoch+1, avg_loss, accuracy))
+            
             # Save best model
             if accuracy > best_accuracy:
                 best_accuracy = accuracy
-                torch.save(model.state_dict(), self.model_path)
+                torch.save(model.state_dict(), os.path.join(self.model_path, self.model_name))
                 print(f"Best model saved with accuracy: {best_accuracy:.2f}%")
 
     def test(self):
         trainloader, testloader, num_classes = self.get_data()
-        
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
         # Load model
-        model = CNN(num_classes=num_classes).to(device)
-        state_dict = torch.load(self.model_path, map_location=device, weights_only=True)
-        model.load_state_dict(state_dict)
+        device, model, criterion, optimizer = self.get_model(num_classes, load_pretrain=True)
         model.eval()
-        
         correct = 0
         total = 0
         with torch.no_grad():
@@ -117,7 +165,6 @@ class classification:
                 _, predicted = torch.max(outputs.data, 1)
                 total += y.size(0)
                 correct += (predicted == y).sum().item()
-        
         accuracy = 100 * correct / total
         print(f"Test Accuracy: {accuracy:.2f}%")
 

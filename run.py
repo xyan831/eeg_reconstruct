@@ -42,7 +42,7 @@ def run_our(path_list, name):
     our.file_config("our10", file_pattern=r'eeg_9[1-9]\.edf')
     our.make_data()
 
-def run_nicu(path_list, dataset, name):
+def run_nicu(path_list, name):
     # get folder paths
     mat_path, our_path, nicu_path = path_list
     nicu = data_raw(name, mat_path, nicu_path, dataset="nicu")
@@ -57,6 +57,7 @@ def run_nicu(path_list, dataset, name):
 def run_mat(path_list, name, listname, ch_max, block_ch, data_type, mask_type):
     # get folder paths
     mat_path, data_path = path_list
+    #namelist = [f"{listname}02"]
     namelist = [f"{listname}01", f"{listname}02", f"{listname}03", f"{listname}04", f"{listname}05",
                 f"{listname}06", f"{listname}07", f"{listname}08", f"{listname}09", f"{listname}10"]
     mat = data_mat(name, mat_path, data_path)
@@ -64,11 +65,12 @@ def run_mat(path_list, name, listname, ch_max, block_ch, data_type, mask_type):
     mat.file_config(name, namelist=namelist)
     mat.make_data()
 
-def run_unet(path_list, run_type, name, model, epoch_num, data_type, isFFT, sample):
+def run_recon(path_list, run_type, name, model, modeltype, epoch_num, data_type, isFFT, savebest, sample):
     data_path, model_path, log_path, gen_path, visual_path = path_list
     
-    unet1 = reconstruct(data_path, model_path, log_path, gen_path, visual_path, name, model)
-    unet1.config(data_type=data_type, epoch_num=epoch_num, isFFT=isFFT, sample=sample)
+    unet1 = reconstruct(data_path, model_path, log_path, gen_path, visual_path)
+    unet1.config(name, model, modeltype, 
+                data_type=data_type, epoch_num=epoch_num, isFFT=isFFT, savebest=savebest, sample=sample)
     
     if run_type=="train":    # train model
         unet1.train()
@@ -77,9 +79,9 @@ def run_unet(path_list, run_type, name, model, epoch_num, data_type, isFFT, samp
     else:
         print("invalid run type")
 
-def run_cnn(path_list, run_type, name, model):
+def run_class(path_list, run_type, name, model, model_type, num_epochs):
     # get folder paths
-    model_path, mat_path, gen_path = path_list
+    model_path, log_path, mat_path, gen_path, data_path = path_list
     
     if run_type=="train":
         data_path = mat_path
@@ -88,8 +90,8 @@ def run_cnn(path_list, run_type, name, model):
     else:
         print("invalid run type")
     
-    model_path = os.path.join(model_path, f'{model}_best_cnn.pth')
-    cnn1 = classification(data_path, model_path, name)
+    cnn1 = classification(data_path, model_path, log_path, name, model,
+                            model_type=model_type, num_epochs=num_epochs)
     
     if run_type=="train":
         cnn1.train()
@@ -108,15 +110,21 @@ if __name__ == "__main__":
     mat_path = "result/data_mat"
     our_path = "../L1-Transformer/data/Our/eeg"
     nicu_path = "../L1-Transformer/data/NICU/eeg"
-    
-    ch_max = 4                 # for random mask
-    block_ch = [1, 2, 3, 4]    # for custom mask
+
     epoch_num = 10
     isFFT = True
+    ch_max = 4                 # for random mask
+    block_ch = [1, 2, 3, 4]    # for custom mask
     name = "4r"
-    train_data = f"our{name}01"
-    unet_model = f"our{name}_fft1"
-    cnn_model = f"our{name}1"
+    dataset = "our"
+    # reconstruction models: unet, vae, diffusion
+    recon_type = "unet"
+    savebest = False
+    # classification models: cnn, lstm, transformer
+    class_type = "cnn"
+    train_data = f"{dataset}{name}01"
+    recon_model = f"{dataset}{name}_fft"
+    class_model = f"{dataset}{name}1"
     sample = 0
     
     # prepare rawdata
@@ -126,18 +134,19 @@ if __name__ == "__main__":
 
     # prepare dataset
     path_list = [mat_path, data_path]
-    #run_mat(path_list, f"our{name}01", "our", ch_max, block_ch, "both", "random")
-    #run_mat(path_list, f"our{name}02", "our", ch_max, block_ch, "seiz", "random")
-    #run_mat(path_list, f"our{name}02", "our", ch_max, block_ch, "nseiz", "random")
+    #run_mat(path_list, train_data, dataset, ch_max, block_ch, "both", "random")
+    #run_mat(path_list, train_data, dataset, ch_max, block_ch, "seiz", "random")
+    #run_mat(path_list, train_data, dataset, ch_max, block_ch, "nseiz", "random")
     
     # reconstruction model training/testing (80/20)
     path_list = [data_path, model_path, log_path, gen_path, visual_path]
-    run_unet(path_list, "train", train_data, unet_model, epoch_num, "both", isFFT, sample)
-    #run_unet(path_list, "test", train_data, unet_model, epoch_num, "seiz", isFFT, sample)
-    #run_unet(path_list, "test", train_data, unet_model, epoch_num, "nseiz", isFFT, sample)
+    run_recon(path_list, "train", train_data, recon_model, recon_type, epoch_num, "both", isFFT, savebest, sample)
+    #run_recon(path_list, "test", train_data, recon_model, recon_type, epoch_num, "seiz", isFFT, savebest, sample)
+    #run_recon(path_list, "test", train_data, recon_model, recon_type, epoch_num, "nseiz", isFFT, savebest, sample)
     
     # classification
-    path_list = [model_path, mat_path, gen_path]
-    #run_cnn(path_list, "train", f"our{name}01", cnn_model)
-    #run_cnn(path_list, "test", f"our{name}02", cnn_model)
+    path_list = [model_path, log_path, mat_path, gen_path, data_path]
+    #run_class(path_list, "train", f"our01", class_model, class_type, epoch_num)
+    #run_class(path_list, "train", f"nicu01", class_model, class_type, epoch_num)
+    #run_class(path_list, "test", train_data, class_model, class_type, epoch_num)
 
