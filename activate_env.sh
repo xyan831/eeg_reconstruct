@@ -7,7 +7,7 @@ source /root/miniconda3/etc/profile.d/conda.sh
 conda activate /root/autodl-tmp/eeg_reconstruct/env
 
 # run in command line
-source activate_env.sh
+#source activate_env.sh
 
 # run in command line if file has problems
 # sed -i 's/\r$//' activate_env.sh
