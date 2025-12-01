@@ -13,11 +13,11 @@ class data_mat:
         self.config()
         self.file_config(name, namelist=[name])
 
-    def config(self, data_type="both", ch_max=4, block_ch=[1,2,3,4], mask_type="random"):
+    def config(self, data_type="both", ch_max=4, block_ch=[1,2,3,4], is_custom=False):
         self.data_type = data_type
         self.ch_max = ch_max
         self.block_ch = block_ch
-        self.mask_type = mask_type
+        self.is_custom = is_custom
 
     def file_config(self, name, namelist=[]):
         self.norm_name = f"{name}_norm_{self.data_type}.mat"
@@ -36,7 +36,6 @@ class data_mat:
         
         # load rawdata
         datalist = []
-        debug = []
         for filename in self.filelist:
             filedata = mat2numpy(os.path.join(self.mat_path, filename), self.label)
             if filedata.shape!=(0, 0):
@@ -46,12 +45,9 @@ class data_mat:
         print(data_orig.shape)
         
         # get masked data
-        if self.mask_type=="random":
-            data_mask = self.random_mask(data_orig, data_orig.shape[1])
-        elif self.mask_type=="custom":
+        if self.is_custom:
             data_mask = self.custom_mask(data_orig, data_orig.shape[1])
         else:
-            mask_type=="random"
             data_mask = self.random_mask(data_orig, data_orig.shape[1])
         
         print("saving data to mat")

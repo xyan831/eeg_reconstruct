@@ -22,10 +22,15 @@ class classification:
         self.num_epochs = num_epochs
         self.model_type = model_type
         self.model_name = f"{model}_class_{model_type}.pth"
-        self.log_name = f"{model}_class_{model_type}"
+        self.log_name = f"{model}_class_{model_type}.txt"
         self.seiz_name = f"{name}_seizure_data.mat"
         self.nseiz_name = f"{name}_non_seizure_data.mat"
         self.name = name
+        self.label = "data"
+
+    def file_config(self, name, namelist=[]):
+        self.seizlist = [f"{name}_seizure_data.mat" for name in namelist]
+        self.nseizlist = [f"{name}_non_seizure_data.mat" for name in namelist]
 
     def get_logname(self):
         now = datetime.now()
@@ -68,8 +73,17 @@ class classification:
         return device, model, criterion, optimizer
 
     def get_data(self):
-        seiz_data = mat2numpy(os.path.join(self.data_path, self.seiz_name), "data")
-        nseiz_data = mat2numpy(os.path.join(self.data_path, self.nseiz_name), "data")
+        #seiz_data = mat2numpy(os.path.join(self.data_path, self.seiz_name), self.label)
+        #nseiz_data = mat2numpy(os.path.join(self.data_path, self.nseiz_name), self.label)
+        seiz_datalist = []
+        nseiz_datalist = []
+        for seizfile, nseizfile in zip(self.seizlist, self.nseizlist):
+            data_seiz = mat2numpy(os.path.join(self.data_path, seizfile), self.label)
+            data_nseiz = mat2numpy(os.path.join(self.data_path, nseizfile), self.label)
+            seiz_datalist.append(data_seiz)
+            nseiz_datalist.append(data_nseiz)
+        seiz_data = np.concatenate(seiz_datalist)        
+        nseiz_data = np.concatenate(nseiz_datalist)
         
         full_data = np.concatenate((seiz_data, nseiz_data), axis=0)
         full_label = get_datalabel(seiz_data, nseiz_data)
@@ -100,10 +114,10 @@ class classification:
 
     def train(self):
         # create results file for log
-        log_name = self.get_logname()
-        results_file = os.path.join(self.log_path, log_name)
+        #log_name = self.get_logname()
+        log_file = os.path.join(self.log_path, self.log_name)
         # Create results file with header
-        with open(results_file, "w") as f:
+        with open(log_file, "w") as f:
             f.write("epoch,train_loss,val_acc\n")
         
         # get data
@@ -141,7 +155,7 @@ class classification:
             print(f"Validation Accuracy: {accuracy:.2f}%")
             
             # Log results to file
-            with open(results_file, "a") as f:
+            with open(log_file, "a") as f:
                 f.write("{},{:.4f},{:.4f}\n".format(epoch+1, avg_loss, accuracy))
             
             # Save best model
@@ -149,6 +163,9 @@ class classification:
                 best_accuracy = accuracy
                 torch.save(model.state_dict(), os.path.join(self.model_path, self.model_name))
                 print(f"Best model saved with accuracy: {best_accuracy:.2f}%")
+        
+        print("saved model to", self.model_name)
+        print("results logged to", self.log_name)
 
     def test(self):
         trainloader, testloader, num_classes = self.get_data()

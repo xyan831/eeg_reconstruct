@@ -11,10 +11,10 @@ from sklearn.model_selection import train_test_split
 
 from .data_util import mat2numpy, crop_timestep, convert_fft
 from .model_util import normalize, torch_dataloader
-#from .model_unet import UNet1D
-#from .model_unet_ch_att import UNet1D
-#from .model_unet_tm_att import UNet1D
-from .model_unet_fl_att import UNet1D
+from .model_unet import UNet1D as unet
+from .model_unet_ch_att import UNet1D as unet_ch
+from .model_unet_tm_att import UNet1D as unet_tm
+from .model_unet_fl_att import UNet1D as unet_fl
 from .model_vae import VAE1D, VAELoss
 from .model_sdiffusion import StableDiffusionEEG, DiffusionLoss, EEGReconstructionMetrics
 from .visualize import save_pred_side
@@ -27,7 +27,6 @@ class reconstruct:
         self.gen_path = gen_path
         self.visual_path = visual_path
         self.label = "data"
-        #self.config("our", "unet", "unet_ch")
 
     def config(self, name, model, model_type="unet", data_type="both", epoch_num=10, isFFT=False, savebest=False, sample=0):
         self.name = name
@@ -38,7 +37,7 @@ class reconstruct:
         self.savebest = savebest
         self.sample = sample
         self.model_name = f"{model}_recon{epoch_num}e_{model_type}.pth"
-        self.log_name = f"{model}_recon_{self.model_type}"
+        self.log_name = f"{model}_recon_{self.model_type}.txt"
         self.norm_name = f"{name}_norm_{data_type}.mat"
         self.mask_name = f"{name}_mask_{data_type}.mat"
         if data_type=="seiz":
@@ -69,8 +68,16 @@ class reconstruct:
         # Initialize Model, Loss, Optimizer
         #device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        if self.model_type=="unet":
-            model = UNet1D(in_channels=in_ch, out_channels=out_ch).to(device)
+        if "unet" in self.model_type:
+            if self.model_type=="unet-ch":
+                model = unet_ch(in_channels=in_ch, out_channels=out_ch).to(device)
+            elif self.model_type=="unet-tm":
+                model = unet_tm(in_channels=in_ch, out_channels=out_ch).to(device)
+            elif self.model_type=="unet-fl":
+                model = unet_fl(in_channels=in_ch, out_channels=out_ch).to(device)
+            else:
+                print("using model unet")
+                model = unet(in_channels=in_ch, out_channels=out_ch).to(device)
             criterion = nn.MSELoss()  # For regression tasks
         elif self.model_type=="vae":
             model = VAE1D(in_channels=in_ch, out_channels=out_ch, latent_dim=128, seq_len=496).to(device)
@@ -159,7 +166,7 @@ class reconstruct:
         if self.savebest==False:
             torch.save(model.state_dict(), os.path.join(self.model_path, self.model_name))
             print("Model train complete, saved as", self.model_name)
-        print("Results logged")
+        print("Results logged in", self.log_name)
         
         # Get predictions for test set
         y_pred = self.predict(device, model, test_loader)
@@ -286,12 +293,12 @@ class reconstruct:
 
     def train_model(self, device, model, criterion, optimizer, dataloader):
         # create results file for log
-        log_name = self.get_logname()
-        results_file = os.path.join(self.log_path, log_name)
+        #log_name = self.get_logname()
+        log_file = os.path.join(self.log_path, self.log_name)
         # Create results file with header
-        with open(results_file, "w") as f:
-            if self.model_type=="unet":
-                f.write("epoch,loss\n")
+        with open(log_file, "w") as f:
+            if "unet" in self.model_type:
+                f.write("epoch,total_loss\n")
             elif self.model_type=="vae":
                 f.write("epoch,total_loss,recon_loss,kl_loss\n")
             elif self.model_type == "diffusion":
@@ -315,7 +322,7 @@ class reconstruct:
                 X_batch, y_batch = X_batch.to(device), y_batch.to(device)
 
                 # Forward pass
-                if self.model_type=="unet":
+                if "unet" in self.model_type:
                     outputs = model(X_batch)
                     loss = criterion(outputs, y_batch)
                     batch_recon = loss.item()
@@ -371,8 +378,8 @@ class reconstruct:
                 print("best model saved as", self.model_name)
             
             # Log results to file
-            with open(results_file, "a") as f:
-                if self.model_type=="unet":
+            with open(log_file, "a") as f:
+                if "unet" in self.model_type:
                     f.write("{},{:.4f}\n".format(epoch+1, avg_loss))
                 elif self.model_type=="vae":
                     f.write("{},{:.4f},{:.4f},{:.4f}\n".format(epoch+1, avg_loss, avg_recon_loss, avg_kl_loss))
