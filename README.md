@@ -5,9 +5,8 @@
 ### Directory Structure
 
 - ``/data``: .edf files. EEG data with seizure information.
-    - ``CHB-MIT/``: from CHB MIT database
 	- ``NICU/``: from NICU database
-    - ``Our/``: from patients
+    - ``Our/``: custom eeg data from patients
 - ``/result``: generated files from scripts
     - ``data_gen/``: .mat files. reconstructed EEG data
     - ``data_mat/``: .mat files. 500 timestep samples from .edf rawdata
@@ -22,11 +21,16 @@
     - ``data_util.py``: utility functions for data processing
     - ``reconstruct.py``: data reconstruction script
     - ``model_cnn.py``: CNN model for classification
+    - ``model_cnn_lstm.py``: CNN_LSTM model for classification
+    - ``model_transformer.py``: Transformer model for classification
     - ``model_unet.py``: U-Net model for reconstruction
     - ``model_unet_ch_att.py``: U-Net model with Channel Attention for reconstruction
     - ``model_unet_tm_att.py``: U-Net model with Temporal Attention for reconstruction
     - ``model_unet_ch_att.py``: U-Net model with Channel+Temporal Attention for reconstruction
+    - ``model_vae.py``: VAE model for reconstruction
+    - ``model_sdiffusion.py``: Standard Diffusion model for reconstruction
     - ``model_util.py``: utility functions for model training/testing
     - ``visualize.py``: visualize reconstruction results
 - ``run.py``: edit and execute this file for whatever function you need
+- ``activate_env.sh``: setup virtual env in chosen folder, edit path as needed
 
