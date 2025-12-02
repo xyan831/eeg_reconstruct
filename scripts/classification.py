@@ -67,6 +67,7 @@ class classification:
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
         if load_pretrain==True:
+            print("load model: ", self.model_name)
             model_file = os.path.join(self.model_path, self.model_name)
             state_dict = torch.load(model_file, map_location=device, weights_only=True)
             model.load_state_dict(state_dict)
@@ -168,6 +169,7 @@ class classification:
         print("results logged to", self.log_name)
 
     def test(self):
+        print(f"testing {self.name}")
         trainloader, testloader, num_classes = self.get_data()
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # Load model

@@ -5,7 +5,6 @@ from scripts.data_raw import data_raw
 
 from scripts.reconstruct import reconstruct
 from scripts.classification import classification
-from scripts.visualize import log_graph
 
 def run_our(path_list, name):
     # get folder paths
@@ -138,7 +137,7 @@ if __name__ == "__main__":
     block_ch = [1, 2, 3, 4]
     name = f"{ch_max}r"
     # dataset type
-    dataset = "nicu"
+    dataset = "our"
     # reconstruction models: unet, unet-ch, unet-tm, unet-fl, vae, diffusion
     recon_type = "unet"
     savebest = False
@@ -169,10 +168,19 @@ if __name__ == "__main__":
     
     # classification
     path_list = [model_path, log_path, mat_path, gen_path, data_path]
-    run_class(path_list, "train", train_data, dataset, class_model, class_type, epoch_num)
+    #run_class(path_list, "train", train_data, dataset, class_model, class_type, epoch_num)
     #run_class(path_list, "test", train_data, dataset, class_model, class_type, epoch_num)
+    
+    # test
+    run_class(path_list, "test", train_data+"_norm", dataset, class_model, class_type, epoch_num)
+    run_class(path_list, "test", train_data+"_mask", dataset, class_model, class_type, epoch_num)
+    run_class(path_list, "test", train_data+"_unet", dataset, class_model, class_type, epoch_num)
+    run_class(path_list, "test", train_data+"_unet-ch", dataset, class_model, class_type, epoch_num)
+    run_class(path_list, "test", train_data+"_unet-tm", dataset, class_model, class_type, epoch_num)
+    run_class(path_list, "test", train_data+"_unet-fl", dataset, class_model, class_type, epoch_num)
+    run_class(path_list, "test", train_data+"_vae", dataset, class_model, class_type, epoch_num)
+    run_class(path_list, "test", train_data+"_diffusion", dataset, class_model, class_type, epoch_num)
 
-    # graph training log
-    #run_log(visual_path, log_path, single_log=True, log_num=0)
-    #run_log(visual_path, log_path, single_log=False, log_num=0)
+
+
 
