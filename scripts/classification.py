@@ -23,14 +23,14 @@ class classification:
         self.model_type = model_type
         self.model_name = f"{model}_class_{model_type}.pth"
         self.log_name = f"{model}_class_{model_type}.txt"
-        self.seiz_name = f"{name}_seizure_data.mat"
-        self.nseiz_name = f"{name}_non_seizure_data.mat"
+        self.seiz_name = f"{name}_seiz.mat"
+        self.nseiz_name = f"{name}_nseiz.mat"
         self.name = name
         self.label = "data"
 
     def file_config(self, name, namelist=[]):
-        self.seizlist = [f"{name}_seizure_data.mat" for name in namelist]
-        self.nseizlist = [f"{name}_non_seizure_data.mat" for name in namelist]
+        self.seizlist = [f"{name}_seiz.mat" for name in namelist]
+        self.nseizlist = [f"{name}_nseiz.mat" for name in namelist]
 
     def get_logname(self):
         now = datetime.now()

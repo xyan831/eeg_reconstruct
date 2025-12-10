@@ -41,9 +41,9 @@ class reconstruct:
         self.norm_name = f"{name}_norm_{data_type}.mat"
         self.mask_name = f"{name}_mask_{data_type}.mat"
         if data_type=="seiz":
-            self.gen_name = f"{name}_{model_type}_seizure_data.mat"
+            self.gen_name = f"{name}_{model_type}_seiz.mat"
         elif data_type=="nseiz":
-            self.gen_name = f"{name}_{model_type}_non_seizure_data.mat"
+            self.gen_name = f"{name}_{model_type}_nseiz.mat"
         else:
             self.gen_name = f"{name}_data.mat"
         self.result_name_norm = f"{name}{data_type}_e{epoch_num}_{model_type}_norm_s{sample}.pdf"

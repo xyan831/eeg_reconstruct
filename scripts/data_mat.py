@@ -22,8 +22,8 @@ class data_mat:
     def file_config(self, name, namelist=[]):
         self.norm_name = f"{name}_norm_{self.data_type}.mat"
         self.mask_name = f"{name}_mask_{self.data_type}.mat"
-        seizlist = [f"{name}_seizure_data.mat" for name in namelist]
-        nseizlist = [f"{name}_non_seizure_data.mat" for name in namelist]
+        seizlist = [f"{name}_seiz.mat" for name in namelist]
+        nseizlist = [f"{name}_nseiz.mat" for name in namelist]
         if self.data_type=="seiz":
             self.filelist = seizlist
         elif self.data_type=="nseiz":

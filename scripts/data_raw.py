@@ -27,8 +27,8 @@ class data_raw:
         self.std_max = std_max
 
     def file_config(self, name, max_files=None, file_pattern=None, exclude_files=None):
-        self.seiz_name = f"{name}_seizure_data.mat"
-        self.nseiz_name = f"{name}_non_seizure_data.mat"
+        self.seiz_name = f"{name}_seiz.mat"
+        self.nseiz_name = f"{name}_nseiz.mat"
         self.max_files = max_files
         self.file_pattern = file_pattern
         self.exclude_files = exclude_files or []
