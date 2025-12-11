@@ -50,7 +50,7 @@ if __name__ == "__main__":
     #run_recon(path_list, "train", train_data1, recon_model, "unet-tm", epoch_num, "both", isFFT, savebest, sample)
     #run_recon(path_list, "train", train_data1, recon_model, "unet-fl", epoch_num, "both", isFFT, savebest, sample)
     #run_recon(path_list, "train", train_data1, recon_model, "vae", epoch_num, "both", isFFT, savebest, sample)
-    #run_recon(path_list, "train", train_data1, recon_model, "diffustion", epoch_num, "both", isFFT, savebest, sample)
+    #run_recon(path_list, "train", train_data1, recon_model, "diffusion", epoch_num, "both", isFFT, savebest, sample)
     # test
     #run_recon(path_list, "test", train_data2, recon_model, "unet", epoch_num, "seiz", isFFT, savebest, sample)
     #run_recon(path_list, "test", train_data2, recon_model, "unet", epoch_num, "nseiz", isFFT, savebest, sample)
