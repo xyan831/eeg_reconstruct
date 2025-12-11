@@ -1,6 +1,6 @@
 #!/bin/bash
 
-home_path="/home/jlwang24"
+home_path="path/to/home"
 conda_path="$home_path/miniconda3"
 conda_bin="$conda_path/bin"
 conda_load="$conda_path/etc/profile.d/conda.sh"
