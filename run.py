@@ -1,6 +1,6 @@
 import os
 
-from scripts.test import run_our, run_mat1, run_mat2, run_recon, run_class
+from scripts.test import run_our, run_nicu, run_mat1, run_mat2, run_recon, run_class
 
 if __name__ == "__main__":
     # folder paths
