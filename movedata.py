@@ -18,7 +18,7 @@ for fname in os.listdir(src_dir):
     src_path = os.path.join(src_dir, fname)
     dst_path = os.path.join(dst_dir, fname)
 
-    print(f"Copying: {fname} -> {newname}")
+    print(f"Copying: {fname}")
     shutil.copyfile(src_path, dst_path)
 
 print("copy ok")

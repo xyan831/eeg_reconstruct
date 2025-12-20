@@ -23,6 +23,8 @@ class classification:
         self.model_type = model_type
         self.model_name = f"{model}_class_{model_type}.pth"
         self.log_name = f"{model}_class_{model_type}.txt"
+        self.test_log_name = "test_log.txt"
+        self.time_log_name = "time_log.txt"
         self.seiz_name = f"{name}_seiz.mat"
         self.nseiz_name = f"{name}_nseiz.mat"
         self.name = name
@@ -31,10 +33,6 @@ class classification:
     def file_config(self, name, namelist=[]):
         self.seizlist = [f"{name}_seiz.mat" for name in namelist]
         self.nseizlist = [f"{name}_nseiz.mat" for name in namelist]
-
-    def get_logname(self):
-        now = datetime.now()
-        return f"{self.log_name}_{now.strftime('%Y%m%d_%H%M%S')}.txt"
 
     def get_model(self, num_classes, load_pretrain=False):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -114,17 +112,16 @@ class classification:
         return trainloader, testloader, num_classes
 
     def train(self):
-        # create results file for log
-        #log_name = self.get_logname()
-        log_file = os.path.join(self.log_path, self.log_name)
-        # Create results file with header
-        with open(log_file, "w") as f:
-            f.write("epoch,train_loss,val_acc\n")
+        # Create results log file header
+        with open(os.path.join(self.log_path, self.log_name), "w") as f:
+            f.write("epoch,train_loss,val_acc,val_sen,val_spe,val_f1\n")
         
         # get data
         trainloader, testloader, num_classes = self.get_data()
         device, model, criterion, optimizer = self.get_model(num_classes, load_pretrain=False)
         best_accuracy = 0.0
+        # track time for process
+        start_time = datetime.now()
         for epoch in range(self.num_epochs):
             model.train()
             running_loss = 0.0
@@ -142,31 +139,42 @@ class classification:
             
             # Evaluation
             model.eval()
-            correct = 0
-            total = 0
+            TP = TN = FP = FN = 0
             with torch.no_grad():
                 for X, y in testloader:
                     X, y = X.to(device), y.to(device)
                     outputs = model(X)
                     _, predicted = torch.max(outputs.data, 1)
-                    total += y.size(0)
-                    correct += (predicted == y).sum().item()
+                    TP += ((predicted == 1) & (y == 1)).sum().item()
+                    TN += ((predicted == 0) & (y == 0)).sum().item()
+                    FP += ((predicted == 1) & (y == 0)).sum().item()
+                    FN += ((predicted == 0) & (y == 1)).sum().item()
 
-            accuracy = 100 * correct / total
-            print(f"Validation Accuracy: {accuracy:.2f}%")
+            accuracy = (TP + TN) / (TP + TN + FP + FN + 1e-8)
+            sensitivity = TP / (TP + FN + 1e-8)
+            specificity = TN / (TN + FP + 1e-8)
+            precision = TP / (TP + FP + 1e-8)
+            f1 = 2 * precision * sensitivity / (precision + sensitivity + 1e-8)
+            print(f"acc: {accuracy * 100:.2f}%, sen: {sensitivity * 100:.2f}%, spe: {specificity * 100:.2f}%, f1: {f1 * 100:.2f}%")
             
             # Log results to file
-            with open(log_file, "a") as f:
-                f.write("{},{:.4f},{:.4f}\n".format(epoch+1, avg_loss, accuracy))
-            
+            with open(os.path.join(self.log_path, self.log_name), "a") as f:
+                f.write(f"{epoch+1},{avg_loss:.4f},{accuracy:.4f},{sensitivity:.4f},{specificity:.4f},{f1:.4f}\n")
             # Save best model
             if accuracy > best_accuracy:
                 best_accuracy = accuracy
                 torch.save(model.state_dict(), os.path.join(self.model_path, self.model_name))
                 print(f"Best model saved with accuracy: {best_accuracy:.2f}%")
         
+        # track time for process
+        end_time = datetime.now()
+        time_taken = end_time - start_time
+        # Log results to file
+        with open(os.path.join(self.log_path, self.time_log_name), "a") as f:
+            f.write(f"Class {self.name}_{self.model_type} Train Time:{time_taken}\n")
         print("saved model to", self.model_name)
         print("results logged to", self.log_name)
+        print("time taken:", time_taken)
 
     def test(self):
         print(f"testing {self.name}")
@@ -177,6 +185,8 @@ class classification:
         model.eval()
         correct = 0
         total = 0
+        # track time for process
+        start_time = datetime.now()
         with torch.no_grad():
             for X, y in testloader:
                 X, y = X.to(device), y.to(device)
@@ -185,5 +195,14 @@ class classification:
                 total += y.size(0)
                 correct += (predicted == y).sum().item()
         accuracy = 100 * correct / total
+        # track time for process
+        end_time = datetime.now()
+        time_taken = end_time - start_time
         print(f"Test Accuracy: {accuracy:.2f}%")
+        print("time Taken:", time_taken)
+        # Log results to file
+        with open(os.path.join(self.log_path, self.test_log_name), "a") as f:
+            f.write(f"Class {self.name}_{self.model_type} Accuracy:{accuracy:.2f}%\n")
+        with open(os.path.join(self.log_path, self.time_log_name), "a") as f:
+            f.write(f"Class {self.name}_{self.model_type} Test Time:{time_taken}\n")
 

@@ -20,43 +20,59 @@ from .model_sdiffusion import StableDiffusionEEG, DiffusionLoss, EEGReconstructi
 from .visualize import save_pred_side
 
 class reconstruct:
-    def __init__(self, data_path, model_path, log_path, gen_path, visual_path):
-        self.data_path = data_path
-        self.model_path = model_path
-        self.log_path = log_path
-        self.gen_path = gen_path
-        self.visual_path = visual_path
+    def __init__(self, path_config, model_config, param_config):
+        self.data_path = path_config.get("data_path")
+        self.model_path = path_config.get("model_path")
+        self.log_path = path_config.get("log_path")
+        self.gen_path = path_config.get("gen_path")
+        self.visual_path = path_config.get("visual_path")
+        
+        self.model_type = model_config.get("model_type", "unet")
+        self.epoch_num = model_config.get("epoch_num", 10)
+        self.learning_rate = model_config.get("learning_rate", 0.001)
+        
+        self.name_prefix = param_config.get("name_prefix")
+        self.model_prefix = param_config.get("model_prefix")
+        self.data_type = param_config.get("data_type", "both")
+        self.isFFT = param_config.get("isFFT", False)
+        self.savebest = param_config.get("savebest", False)
+        self.makevisual = param_config.get("makevisual", False)
+        self.sample = param_config.get("sample", 0)
+        
+        #self.device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.label = "data"
+        self.file_config()
 
-    def config(self, name, model, model_type="unet", data_type="both", epoch_num=10, isFFT=False, savebest=False, sample=0):
-        self.name = name
-        self.model = model
-        self.model_type = model_type
-        self.epoch_num = epoch_num
-        self.isFFT = isFFT
-        self.savebest = savebest
-        self.sample = sample
-        self.model_name = f"{model}_recon{epoch_num}e_{model_type}.pth"
-        self.log_name = f"{model}_recon_{self.model_type}.txt"
-        self.norm_name = f"{name}_norm_{data_type}.mat"
-        self.mask_name = f"{name}_mask_{data_type}.mat"
-        if data_type=="seiz":
-            self.gen_name = f"{name}_{model_type}_seiz.mat"
-        elif data_type=="nseiz":
-            self.gen_name = f"{name}_{model_type}_nseiz.mat"
+    def file_config(self):
+        model_name = f"{self.model_prefix}_recon{self.epoch_num}e_{self.model_type}.pth"
+        log_name = f"{self.model_prefix}_recon_{self.model_type}.txt"
+        test_log_name = "test_log.txt"
+        time_log_name = "time_log.txt"
+        norm_name = f"{self.name_prefix}_norm_{self.data_type}.mat"
+        mask_name = f"{self.name_prefix}_mask_{self.data_type}.mat"
+        if self.data_type=="seiz":
+            gen_name = f"{self.name_prefix}_{self.model_type}_seiz.mat"
+        elif self.data_type=="nseiz":
+            gen_name = f"{self.name_prefix}_{self.model_type}_nseiz.mat"
         else:
-            self.gen_name = f"{name}_data.mat"
-        self.result_name_norm = f"{name}{data_type}_e{epoch_num}_{model_type}_norm_s{sample}.pdf"
-        self.result_name_unnorm = f"{name}{data_type}_e{epoch_num}_{model_type}_unnorm_s{sample}.pdf"
+            gen_name = f"{self.name_prefix}_data.mat"
+        vis_norm_name = f"{self.name_prefix}{self.data_type}_e{self.epoch_num}_{self.model_type}_norm_s{self.sample}.pdf"
+        vis_unnorm_name = f"{self.name_prefix}{self.data_type}_e{self.epoch_num}_{self.model_type}_unnorm_s{self.sample}.pdf"
+        self.model_file = os.path.join(self.model_path, model_name)
+        self.log_file = os.path.join(self.log_path, log_name)
+        self.test_log_file = os.path.join(self.log_path, test_log_name)
+        self.time_log_file = os.path.join(self.log_path, time_log_name)
+        self.norm_file = os.path.join(self.data_path, norm_name)
+        self.mask_file = os.path.join(self.data_path, mask_name)
+        self.gen_file = os.path.join(self.gen_path, gen_name)
+        self.vis_norm_file = os.path.join(self.visual_path, vis_norm_name)
+        self.vis_unnorm_file = os.path.join(self.visual_path, vis_unnorm_name)
 
-    def get_logname(self):
-        now = datetime.now()
-        return f"{self.log_name}_{now.strftime('%Y%m%d_%H%M%S')}.txt"
-
-    def get_data(self, filename, cropsize=16):
+    def get_data(self, file_path, cropsize=16):
         # load normal and masked data
         print("Loading dataset")
-        data = mat2numpy(os.path.join(self.data_path, filename), self.label)
+        data = mat2numpy(file_path, self.label)
         # crop timesteps to fit unet (divisible by 2^(num_encoder_layers) = 2^4 = 16)
         print("Cropping data")
         data = crop_timestep(data, div=cropsize)
@@ -66,34 +82,32 @@ class reconstruct:
 
     def get_model(self, in_ch, out_ch, load_pretrain=False):
         # Initialize Model, Loss, Optimizer
-        #device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if "unet" in self.model_type:
             if self.model_type=="unet-ch":
-                model = unet_ch(in_channels=in_ch, out_channels=out_ch).to(device)
+                model = unet_ch(in_channels=in_ch, out_channels=out_ch).to(self.device)
             elif self.model_type=="unet-tm":
-                model = unet_tm(in_channels=in_ch, out_channels=out_ch).to(device)
+                model = unet_tm(in_channels=in_ch, out_channels=out_ch).to(self.device)
             elif self.model_type=="unet-fl":
-                model = unet_fl(in_channels=in_ch, out_channels=out_ch).to(device)
+                model = unet_fl(in_channels=in_ch, out_channels=out_ch).to(self.device)
             else:
                 print("using model unet")
-                model = unet(in_channels=in_ch, out_channels=out_ch).to(device)
+                model = unet(in_channels=in_ch, out_channels=out_ch).to(self.device)
             criterion = nn.MSELoss()  # For regression tasks
         elif self.model_type=="vae":
-            model = VAE1D(in_channels=in_ch, out_channels=out_ch, latent_dim=128, seq_len=496).to(device)
+            model = VAE1D(in_channels=in_ch, out_channels=out_ch, latent_dim=128, seq_len=496).to(self.device)
             criterion = VAELoss(reconstruction_loss='mse', beta=1.0)  # For regression tasks
         elif self.model_type=="diffusion":
-            model = StableDiffusionEEG(in_channels=in_ch, out_channels=out_ch, timesteps=50).to(device)
+            model = StableDiffusionEEG(in_channels=in_ch, out_channels=out_ch, timesteps=50).to(self.device)
             criterion = DiffusionLoss('l1')
         else:
             raise ValueError(f"Invalid model type {self.model_type}")
-        optimizer = optim.Adam(model.parameters(), lr=0.001)
+        optimizer = optim.Adam(model.parameters(), lr=self.learning_rate)
         if load_pretrain==True:
             # load pretrained model
-            print("load model:", self.model_name)
-            state_dict = torch.load(os.path.join(self.model_path, self.model_name), weights_only=True)
+            print("load model:", self.model_file)
+            state_dict = torch.load(self.model_file, weights_only=True)
             model.load_state_dict(state_dict)
-        return device, model, criterion, optimizer
+        return model, criterion, optimizer
 
     def fill_block(self, block_data, fill_data):
         # replace non blocked channels with original values
@@ -110,17 +124,17 @@ class reconstruct:
         ch_list = list(range(1, out_ch+1))
         #print(ch_list)
         # normalized
-        save_pred_side(os.path.join(self.visual_path, self.result_name_norm), y_pred[0], y_test[0], X_test[0], ch_list, self.sample)
+        save_pred_side(self.vis_norm_file, y_pred[0], y_test[0], X_test[0], ch_list, self.sample)
         print("normalized results recorded as", self.result_name_norm)
         # un-normalized
-        save_pred_side(os.path.join(self.visual_path, self.result_name_unnorm), y_pred[1], y_test[1], X_test[1], ch_list, self.sample)
+        save_pred_side(self.vis_unnorm_file, y_pred[1], y_test[1], X_test[1], ch_list, self.sample)
         print("un_normalized results recorded as", self.result_name_unnorm)
 
     def train(self):
         # prepare data
         print("Prepare training data")
-        X_orig = self.get_data(self.mask_name, cropsize=16)
-        y_orig = self.get_data(self.norm_name, cropsize=16)
+        X_orig = self.get_data(self.mask_file, cropsize=16)
+        y_orig = self.get_data(self.norm_file, cropsize=16)
         
         # Apply FFT along the timesteps dimension (axis=2)
         if self.isFFT==True:
@@ -157,19 +171,19 @@ class reconstruct:
         print("Prepare complete")
         
         # Initialize Model, Loss, Optimizer
-        device, model, criterion, optimizer = self.get_model(in_ch, out_ch, load_pretrain=False)
+        model, criterion, optimizer = self.get_model(in_ch, out_ch, load_pretrain=False)
         
         # Train and save model
         print("Training model")
-        self.train_model(device, model, criterion, optimizer, train_loader)
+        self.train_model(model, criterion, optimizer, train_loader)
         
         if self.savebest==False:
-            torch.save(model.state_dict(), os.path.join(self.model_path, self.model_name))
-            print("Model train complete, saved as", self.model_name)
-        print("Results logged in", self.log_name)
+            torch.save(model.state_dict(), self.model_file)
+            print("Model train complete, saved at", self.model_file)
+        print("Results logged at", self.log_file)
         
         # Get predictions for test set
-        y_pred = self.predict(device, model, test_loader)
+        y_pred = self.predict(model, test_loader)
         print(y_pred.shape)
         
         # Evaluation (MSE)
@@ -180,19 +194,17 @@ class reconstruct:
         # Inverse transform the predicted ECG to original scale
         y_pred2 = normalize(y_pred, scaler1, "reverse")
         
-        # Inverse fft predicted ECG
-        #y_pred2 = np.fft.ifft(y_pred2, axis=2)
-        
         # replace non blocked channels with original values
         y_pred3 = self.fill_block(Xo_test, y_pred2)
         
-        self.visualize(out_ch, [y_pred, y_pred3], [y_test, yo_test], [X_test, Xo_test])
+        if self.makevisual:
+            self.visualize(out_ch, [y_pred, y_pred3], [y_test, yo_test], [X_test, Xo_test])
 
     def test(self):
         # prepare data
         print("Prepare testing data")
-        X_orig = self.get_data(self.mask_name, cropsize=16)
-        y_orig = self.get_data(self.norm_name, cropsize=16)
+        X_orig = self.get_data(self.mask_file, cropsize=16)
+        y_orig = self.get_data(self.norm_file, cropsize=16)
         
         # Apply FFT along the timesteps dimension (axis=2)
         if self.isFFT==True:
@@ -219,84 +231,35 @@ class reconstruct:
         print("Data Prepare complete")
         
         # Initialize Model, Loss, Optimizer, Load pretrain
-        device, model, criterion, optimizer = self.get_model(in_ch, out_ch, load_pretrain=True)
+        model, criterion, optimizer = self.get_model(in_ch, out_ch, load_pretrain=True)
         
         # Get generated data
-        y_pred = self.predict(device, model, full_loader)
+        y_pred = self.predict(model, full_loader)
         print(y_pred.shape)
         
         # Evaluation (MSE)
         #test_mse = np.mean((y_norm - y_pred) ** 2)
         test_mse = torch.mean((y_norm - y_pred) ** 2)
         print(f"Test MSE: {test_mse:.4f}")
+        with open(self.test_log_file, "a") as f:
+            f.write(f"Recon {self.name_prefix}_{self.model_type} MSE:{test_mse:.4f}\n")
         
         # Inverse transform the predicted data to original scale
         y_pred2 = normalize(y_pred, scaler1, "reverse")
-        
-        # Inverse fft predicted ECG
-        #y_pred2 = np.fft.ifft(y_pred2, axis=2)
         
         # replace non blocked channels with original values
         y_pred3 = self.fill_block(X_orig, y_pred2)
         
         # save un-normalized prediction as mat file
-        savemat(os.path.join(self.gen_path, self.gen_name), {self.label:y_pred3})
-        print("generated data saved as", self.gen_name)
+        savemat(self.gen_file, {self.label:y_pred3})
+        print("generated data saved at", self.gen_file)
         
-        self.visualize(out_ch, [y_pred, y_pred3], [y_norm, y_orig], [X_norm, X_orig])
+        if self.makevisual:
+            self.visualize(out_ch, [y_pred, y_pred3], [y_norm, y_orig], [X_norm, X_orig])
 
-    def run(self, filename):
-        # prepare data
-        print("Loading dataset")
-        data_orig = self.get_data(filename, cropsize=16)
-        
-        # Apply FFT along the timesteps dimension (axis=2)
-        if self.isFFT==True:
-            data_orig = convert_fft(data_orig, sampling_rate=500, return_magnitude=True, inverse=False)
-        
-        # normalize data
-        scaler1 = StandardScaler()
-        data_norm = normalize(data_orig, scaler1, "normal")
-        
-        # convert to tensor
-        data_norm = torch.tensor(data_norm, dtype=torch.float32)
-        
-        # prepare dataloader full dataset no split
-        data_loader = DataLoader(TensorDataset(data_norm), batch_size=32, shuffle=False, num_workers=0, pin_memory=True)
-        
-        # in channels out channels
-        in_ch = data_norm[0].shape[0]
-        out_ch = data_norm[0].shape[0]
-        print(f"in_channel = {in_ch}\nout_channel = {out_ch}")
-        
-        print("Data Prepare complete")
-        
-        # Initialize Model, Loss, Optimizer, Load pretrain
-        device, model, criterion, optimizer = self.get_model(in_ch, out_ch, load_pretrain=True)
-        
-        # Get generated data
-        pred_data = predict(device, model, data_loader)
-        print(pred_data.shape)
-        
-        # Inverse transform the predicted data to original scale
-        pred_data2 = normalize(pred_data, scaler1, "reverse")
-        
-        # Inverse fft predicted ECG
-        #pred_data2 = np.fft.ifft(pred_data2, axis=2)
-        
-        # replace non blocked channels with original values
-        pred_data3 = self.fill_block(data_orig, pred_data2)
-        
-        # save un-normalized prediction as mat file
-        savemat(os.path.join(self.gen_path, self.gen_name), {self.label:pred_data3})
-        print("generated data saved as", self.gen_name)
-
-    def train_model(self, device, model, criterion, optimizer, dataloader):
-        # create results file for log
-        #log_name = self.get_logname()
-        log_file = os.path.join(self.log_path, self.log_name)
-        # Create results file with header
-        with open(log_file, "w") as f:
+    def train_model(self, model, criterion, optimizer, dataloader):
+        # create results log file header
+        with open(self.log_file, "w") as f:
             if "unet" in self.model_type:
                 f.write("epoch,total_loss\n")
             elif self.model_type=="vae":
@@ -310,6 +273,8 @@ class reconstruct:
         if self.model_type == "diffusion":
             metrics_calculator = EEGReconstructionMetrics()
         
+        # track time for process
+        start_time = datetime.now()
         model.train()
         for epoch in range(self.epoch_num):
             best_loss = 100
@@ -319,7 +284,7 @@ class reconstruct:
             running_diffusion_loss = 0.0
             running_perceptual_loss = 0.0
             for X_batch, y_batch in dataloader:
-                X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+                X_batch, y_batch = X_batch.to(self.device), y_batch.to(self.device)
 
                 # Forward pass
                 if "unet" in self.model_type:
@@ -374,28 +339,38 @@ class reconstruct:
             # save best model
             if (self.savebest==True) and (avg_loss<best_loss):
                 best_loss = avg_loss
-                torch.save(model.state_dict(), os.path.join(self.model_path, self.model_name))
-                print("best model saved as", self.model_name)
+                torch.save(model.state_dict(), self.model_file)
+                print("best model saved as", self.model_file)
             
             # Log results to file
-            with open(log_file, "a") as f:
+            with open(self.log_file, "a") as f:
                 if "unet" in self.model_type:
-                    f.write("{},{:.4f}\n".format(epoch+1, avg_loss))
+                    f.write(f"{epoch+1},{avg_loss:.4f}\n")
                 elif self.model_type=="vae":
-                    f.write("{},{:.4f},{:.4f},{:.4f}\n".format(epoch+1, avg_loss, avg_recon_loss, avg_kl_loss))
+                    f.write(f"{epoch+1},{avg_loss:.4f},{avg_recon_loss:.4f},{avg_kl_loss:.4f}\n")
                 elif self.model_type == "diffusion":
-                    f.write("{},{:.6f},{:.6f}\n".format(epoch+1, avg_loss, avg_diffusion_loss))
+                    f.write(f"{epoch+1},{avg_loss:.6f},{avg_diffusion_loss:.6f}\n")
                 else:
                     raise ValueError(f"Invalid model type {self.model_type}")
             # print results
             print(f"Epoch {epoch+1}/{self.epoch_num}, Loss: {avg_loss:.4f}")
+        
+        # track time for process
+        end_time = datetime.now()
+        time_taken = end_time - start_time
+        # Log results to file
+        with open(self.time_log_file, "a") as f:
+            f.write(f"Recon {self.name_prefix}_{self.model_type} Train Time:{time_taken}\n")
+        print("time taken:", time_taken)
 
-    def predict(self, device, model, dataloader):
+    def predict(self, model, dataloader):
         model.eval()
         y_pred = []
+        # track time for process
+        start_time = datetime.now()
         with torch.no_grad():
             for X_batch, _ in dataloader:
-                X_batch = X_batch.to(device)
+                X_batch = X_batch.to(self.device)
                 # Handle different model types
                 if self.model_type=="vae":
                     # For VAE, extract only the reconstruction from the tuple
@@ -405,7 +380,7 @@ class reconstruct:
                     # For diffusion models, we need to reconstruct the signal from predicted noise
                     # Since we're in eval mode, we'll use a simple reconstruction approach
                     # Sample timestep 0 (no noise) to get reconstruction
-                    t = torch.zeros(X_batch.shape[0], device=device, dtype=torch.long)
+                    t = torch.zeros(X_batch.shape[0], device=self.device, dtype=torch.long)
                     # Add minimal noise and then denoise
                     noise = torch.randn_like(X_batch) * 0.01  # Small noise
                     x_noisy = X_batch + noise
@@ -416,5 +391,12 @@ class reconstruct:
                     # For UNet and other models
                     y_out = model(X_batch)
                 y_pred.append(y_out.cpu().numpy())
+        # track time for process
+        end_time = datetime.now()
+        time_taken = end_time - start_time
+        # Log results to file
+        with open(self.time_log_file, "a") as f:
+            f.write(f"Recon {self.name_prefix}_{self.model_type} Test Time:{time_taken}\n")
+        print("time taken:", time_taken)
         return np.concatenate(y_pred, axis=0)
 

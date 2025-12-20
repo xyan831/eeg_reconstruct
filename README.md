@@ -35,5 +35,4 @@
 - ``run.py``: execute this file
 - ``compare_graph.py``: create comparison graphs for model training
 - ``movedata.py``: for copy data to diff folder
-- ``activate_env.sh``: setup virtual env in chosen folder, edit path as needed
 

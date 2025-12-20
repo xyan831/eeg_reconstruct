@@ -7,37 +7,32 @@ import mne
 from .data_util import filter_data, SP_50
 
 class data_raw:
-    def __init__(self, name, mat_path, raw_path, dataset="our"):
-        self.mat_path = mat_path
-        self.raw_path = raw_path
-        self.label = "data"
-        self.dataset = dataset
-        valid_dataset = ["our", "nicu"]
-        if dataset not in valid_dataset:
-            raise ValueError(f"Invalid dataset type: '{dataset}'. Must be one of: {valid_dataset}")
+    def __init__(self, path_config, param_config, file_config):
+        self.mat_path = path_config.get("mat_path")
+        self.raw_path = path_config.get("raw_path")
         
-        self.config()
-        self.file_config(name, max_files=5)
-
-    def config(self, max_ch=None, timesteps=500, step_size=500, std_min=1e-10, std_max=1e10):
-        self.max_ch = max_ch
-        self.timesteps = timesteps
-        self.step_size = step_size
-        self.std_min = std_min
-        self.std_max = std_max
-
-    def file_config(self, name, max_files=None, file_pattern=None, exclude_files=None):
-        self.seiz_name = f"{name}_seiz.mat"
-        self.nseiz_name = f"{name}_nseiz.mat"
-        self.max_files = max_files
-        self.file_pattern = file_pattern
-        self.exclude_files = exclude_files or []
+        self.dataset = param_config.get("dataset", "our")
+        self.max_ch = param_config.get("max_ch", None)
+        self.timesteps = param_config.get("timesteps", 500)
+        self.step_size = param_config.get("step_size", 500)
+        self.std_min = param_config.get("std_min", 1e-10)
+        self.std_max = param_config.get("std_max", 1e10)
+        
+        self.name_prefix = file_config.get("name_prefix")
+        self.max_files = file_config.get("max_files", None)
+        self.file_pattern = file_config.get("file_pattern", None)
+        self.exclude_files = file_config.get("exclude_files", [])
+        
+        self.label = "data"
+        seiz_name = f"{self.name_prefix}_seiz.mat"
+        nseiz_name = f"{self.name_prefix}_nseiz.mat"
+        self.seiz_file = os.path.join(self.mat_path, seiz_name)
+        self.nseiz_file = os.path.join(self.mat_path, nseiz_name)
 
     def make_data(self):
         print("start make data")
         summary_path = os.path.join(self.raw_path, "eeg_summary.txt")
         seiz_info = self.get_summary(summary_path)
-        
         all_seiz_data, all_nseiz_data = self.get_data(seiz_info)
         
         # Convert lists to numpy arrays
@@ -47,18 +42,25 @@ class data_raw:
         print(f"Total seizure segments: {len(seiz_data)}")
         print(f"Total non-seizure segments: {len(nseiz_data)}")
         
-        # 50hz filter
-        seiz_data = SP_50(seiz_data, fs=self.timesteps)
-        nseiz_data = SP_50(nseiz_data, fs=self.timesteps)
+        if len(seiz_data)>0:
+            # 50hz filter
+            seiz_data = SP_50(seiz_data, fs=self.timesteps)
+            # std filter
+            #seiz_data = filter_data(seiz_data, self.std_max, self.std_min)
+            # save data
+            savemat(self.seiz_file, {self.label:seiz_data})
+        else:
+            print("Warning: No seizure data to save!")
+        if len(nseiz_data)>0:
+            # 50hz filter
+            nseiz_data = SP_50(nseiz_data, fs=self.timesteps)
+            # std filter
+            #nseiz_data = filter_data(nseiz_data, self.std_max, self.std_min)
+            # save data
+            savemat(self.nseiz_file, {self.label:nseiz_data})
+        else:
+            print("Warning: No non-seizure data to save!")
         
-        # std filter
-        #seiz_data = filter_data(seiz_data, self.std_max, self.std_min)
-        #nseiz_data = filter_data(nseiz_data, self.std_max, self.std_min)
-        
-        # save data
-        print("saving data to mat")
-        savemat(os.path.join(self.mat_path, self.seiz_name), {self.label:seiz_data})
-        savemat(os.path.join(self.mat_path, self.nseiz_name), {self.label:nseiz_data})
         print("save complete")
 
     def get_summary(self, summary_path):
@@ -90,7 +92,7 @@ class data_raw:
             seiz_info[filename] = seizures
         return seiz_info
 
-    def _get_edf_file_list(self):
+    def get_file_list(self):
         """Get filtered list of EDF files to process"""
         all_files = []
         for filename in os.listdir(self.raw_path):
@@ -98,53 +100,46 @@ class data_raw:
                 # Check if file should be excluded
                 if filename in self.exclude_files:
                     continue
-                
                 # Check file pattern if specified
-                if self.file_pattern and not re.match(self.file_pattern, filename):
-                    continue
-                
+                if self.file_pattern:
+                    if not re.search(self.file_pattern, filename):
+                        continue
                 all_files.append(filename)
-        
         # Sort files for consistent ordering
         all_files.sort()
-        
         # Limit number of files if specified
         if self.max_files:
             all_files = all_files[:self.max_files]
-        
-        print(f"Processing {len(all_files)} EDF files: {all_files}")
+        print(f"Found {len(all_files)} EDF files matching criteria")
         return all_files
 
     def get_data(self, seiz_info):
         all_seiz_data = []
         all_nseiz_data = []
-        
-        # Get list of EDF files with filtering
-        edf_files = self._get_edf_file_list()
-        
+        # Get list of EDF files that were parsed from summary
+        summary_filelist = list(seiz_info.keys())
+        valid_filelist = set(self.get_file_list())
+        edf_files = [filename for filename in summary_filelist if filename in valid_filelist]
+        print(f"Processing {len(edf_files)} EDF files from summary")
         # Process each EDF file
         for filename in edf_files:
             file_path = os.path.join(self.raw_path, filename)
             print(f"Processing {filename}...")
-            
             # Load EDF file
             data, sfreq = self.get_edf(file_path, self.max_ch)
             if data is None:
                 continue
-            
             # Get seizure intervals for this file
             file_seiz_info = seiz_info.get(filename, [])
-            
+            print(f"  Found {len(file_seiz_info)} seizure intervals: {file_seiz_info}")
             # Create segments
             seiz_segments, nseiz_segments = self.get_seg(data, sfreq, file_seiz_info)
-            
             if seiz_segments:
                 all_seiz_data.extend(seiz_segments)
+                print(f"  - Added {len(seiz_segments)} seizure segments")
             if nseiz_segments:
                 all_nseiz_data.extend(nseiz_segments)
-            
-            print(f"  - Seizure segments: {len(seiz_segments)}, Non-seizure segments: {len(nseiz_segments)}")
-        
+                print(f"  - Added {len(nseiz_segments)} non-seizure segments")
         return all_seiz_data, all_nseiz_data
 
     def get_edf(self, file_path, max_ch=None):
@@ -156,7 +151,6 @@ class data_raw:
             # Limit channels if specified
             if max_ch is not None and max_ch < data.shape[0]:
                 data = data[:max_ch, :]
-            
             print(f"    Loaded: {data.shape[0]} channels, {data.shape[1]} samples, sfreq: {sfreq}Hz")
             return data, sfreq
         except Exception as e:
@@ -167,11 +161,9 @@ class data_raw:
         # Create seizure and non-seizure segments from EEG data
         seiz_segments = []
         nseiz_segments = []
-        
         total_samples = data.shape[1]
         segment_samples = self.timesteps
         step_samples = self.step_size
-        
         # Convert seizure intervals from seconds to sample indices
         seizure_samples = []
         for seizure in seizure_intervals:
@@ -179,35 +171,28 @@ class data_raw:
             end_sample = int(seizure['end'] * sfreq)
             seizure_samples.append((start_sample, end_sample))
             print(f"    Seizure interval: {seizure['start']}s-{seizure['end']}s -> samples {start_sample}-{end_sample}")
-        
         # Create segments with overlap
         start_idx = 0
         segment_count = 0
         seiz_count = 0
-        
         while start_idx + segment_samples <= total_samples:
             end_idx = start_idx + segment_samples
-            
             # Check if this segment overlaps with any seizure
             is_seizure = False
             for seiz_start, seiz_end in seizure_samples:
-                # Check for overlap - fixed logic
+                # Check for overlap
                 if start_idx < seiz_end and end_idx > seiz_start:
                     is_seizure = True
                     seiz_count += 1
                     break
-            
             segment = data[:, start_idx:end_idx]
             segment_reshaped = segment[np.newaxis, :, :]
-            
             if is_seizure:
                 seiz_segments.append(segment_reshaped)
             else:
                 nseiz_segments.append(segment_reshaped)
-            
             start_idx += step_samples
             segment_count += 1
-        
         print(f"    Total segments: {segment_count}, Seizure segments found: {seiz_count}")
         return seiz_segments, nseiz_segments
 

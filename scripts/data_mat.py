@@ -1,29 +1,31 @@
 import os
 import random
 import numpy as np
+import h5py
 from scipy.io import savemat
 
 from .data_util import mat2numpy
 
 class data_mat:
-    def __init__(self, name, mat_path, data_path):
-        self.mat_path = mat_path
-        self.data_path = data_path
+    def __init__(self, path_config, param_config, file_config):
+        self.mat_path = path_config.get("mat_path")
+        self.data_path = path_config.get("data_path")
+        
+        self.data_type = param_config.get("data_type", "both")
+        self.ch_max = param_config.get("ch_max", 4)
+        self.block_ch = param_config.get("block_ch", [1,2,3,4])
+        self.is_custom = param_config.get("is_custom", False)
+        
+        self.name_prefix = file_config.get("name_prefix", "our01")
+        self.namelist = file_config.get("namelist", [self.name_prefix])
+        seizlist = [f"{name}_seiz.mat" for name in self.namelist]
+        nseizlist = [f"{name}_nseiz.mat" for name in self.namelist]
+        
         self.label = "data"
-        self.config()
-        self.file_config(name, namelist=[name])
-
-    def config(self, data_type="both", ch_max=4, block_ch=[1,2,3,4], is_custom=False):
-        self.data_type = data_type
-        self.ch_max = ch_max
-        self.block_ch = block_ch
-        self.is_custom = is_custom
-
-    def file_config(self, name, namelist=[]):
-        self.norm_name = f"{name}_norm_{self.data_type}.mat"
-        self.mask_name = f"{name}_mask_{self.data_type}.mat"
-        seizlist = [f"{name}_seiz.mat" for name in namelist]
-        nseizlist = [f"{name}_nseiz.mat" for name in namelist]
+        norm_name = f"{self.name_prefix}_norm_{self.data_type}.mat"
+        mask_name = f"{self.name_prefix}_mask_{self.data_type}.mat"
+        self.norm_file = os.path.join(self.data_path, norm_name)
+        self.mask_file = os.path.join(self.data_path, mask_name)
         if self.data_type=="seiz":
             self.filelist = seizlist
         elif self.data_type=="nseiz":
@@ -51,8 +53,13 @@ class data_mat:
             data_mask = self.random_mask(data_orig, data_orig.shape[1])
         
         print("saving data to mat")
-        savemat(os.path.join(self.data_path, self.norm_name), {self.label:data_orig})
-        savemat(os.path.join(self.data_path, self.mask_name), {self.label:data_mask})
+        savemat(self.norm_file, {self.label:data_orig})
+        savemat(self.mask_file, {self.label:data_mask})
+        # if files too large try HDF5 format
+        #with h5py.File(self.norm_file, 'w') as f:
+        #    f.create_dataset(self.label, data=data_orig)
+        #with h5py.File(self.mask_file, 'w') as f:
+        #    f.create_dataset(self.label, data=data_mask)
         print("save complete")
 
     def random_mask(self, data, channels):

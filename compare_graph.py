@@ -5,7 +5,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 # test code
 visual_path = "result/visual"
 log_path = "result/log"
-pdfname = "comparison_graphs.pdf"
+pdfname = "training_comparison_graphs.pdf"
+pdf_path = os.path.join(visual_path, pdfname)
 
 def to_num(s):
     try:
@@ -30,7 +31,6 @@ def load_log(filepath):
 
     return metrics, metric_vals
 
-
 # ----------------------------------------------
 # Group logs by dataset + task
 # dataset: our / nicu
@@ -53,7 +53,7 @@ for log_name in txt_files:
 # ----------------------------------------------
 # Create comparison graphs for each group
 # ----------------------------------------------
-pdf = PdfPages(pdfname)
+pdf = PdfPages(pdf_path)
 
 for (dataset, task), logs in groups.items():
 
