@@ -31,8 +31,7 @@
     - ``model_sdiffusion.py``: Standard Diffusion model for reconstruction
     - ``model_util.py``: utility functions for model training/testing
     - ``visualize.py``: visualize reconstruction results
-    - ``test.py``: functions for how to use scripts
+    - ``test_functions.py``: functions for how to use scripts
 - ``run.py``: execute this file
 - ``compare_graph.py``: create comparison graphs for model training
-- ``movedata.py``: for copy data to diff folder
 

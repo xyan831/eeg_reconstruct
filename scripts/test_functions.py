@@ -38,7 +38,7 @@ def run_mat(path_config, datatype, ch_max, block_ch, is_custom, name_pre, nameli
     mat = data_mat(path_config, param_config, file_config)
     mat.make_data()
 
-def run_recon(path_config,run_type,name_pre,model_pre,modeltype,epoch,learn_rate,datatype, isFFT, savebest, makevis, sample):
+def run_recon(path_config,run_type,name_pre,model_pre,modeltype,epoch,learn_rate,datatype,isFFT,savebest,makevis,sample):
     model_config = {
         "model_type": modeltype,
         "epoch_num": epoch,
@@ -53,38 +53,32 @@ def run_recon(path_config,run_type,name_pre,model_pre,modeltype,epoch,learn_rate
         "makevisual": makevis,
         "sample": sample
     }
-    unet1 = reconstruct(path_config, model_config, param_config)
+    recon1 = reconstruct(path_config, model_config, param_config)
     if run_type=="train":    # train model
-        unet1.train()
+        recon1.train()
     elif run_type=="test":    # test model
-        unet1.test()
+        recon1.test()
     else:
         print("invalid run type")
 
-def run_class(path_config, run_type, name, dataset, model, model_type, num_epochs):
-    # get folder paths
-    model_path = path_config.get("model_path")
-    log_path = path_config.get("log_path")
-    data_path = path_config.get("data_path")
+def run_class(path_config,run_type,name_pre,model_pre,modeltype,epoch,learn_rate,is_usemat,is_usetrain,namelist):
+    model_config = {
+        "model_type": modeltype,
+        "epoch_num": epoch,
+        "learning_rate": learn_rate
+    }
+    param_config = {
+        "name_prefix": name_pre,
+        "model_prefix": model_pre,
+        "namelist": namelist,
+        "is_usemat": is_usemat,
+        "is_usetrain": is_usetrain
+    }
+    class1 = classification(path_config, model_config, param_config)
     if run_type=="train":
-        data_path = path_config.get("mat_path")
-        if dataset=="our":
-            namelist = ["our01","our02","our03","our04","our05"]
-        elif dataset=="nicu":
-            namelist = ["nicu01"]
-        else:
-            print("invalid datset")
+        class1.train()
     elif run_type=="test":
-        data_path = path_config.get("gen_path")
-        namelist = [name]
-    else:
-        print("invalid run type")
-    cnn1 = classification(data_path, model_path, log_path, name, model, model_type=model_type, num_epochs=num_epochs)
-    cnn1.file_config(name, namelist=namelist)
-    if run_type=="train":
-        cnn1.train()
-    elif run_type=="test":
-        cnn1.test()
+        class1.test()
     else:
         print("invalid run type")
 
@@ -153,6 +147,8 @@ if __name__ == "__main__":
     #run_recon(path_config, "test", train_data, recon_model, recon_type, epoch, learn_rate, data_type, isFFT, savebest, makevis, sample)
         
     # classification
-    #run_class(path_config, "train", train_data, dataset, class_model, class_type, epoch)
-    #run_class(path_config, "test", train_data, dataset, class_model, class_type, epoch)
+    #run_class(path_config,"train",train_data,class_model,class_type,epoch,learn_rate,True,False,["our01","our02","our03"])
+    #run_class(path_config,"train",train_data,class_model,class_type,epoch,learn_rate,True,False,["nicu01"])
+    #run_class(path_config,"test",train_data,class_model,class_type,epoch,learn_rate,False,True,[train_data])
+    #run_class(path_config,"test",train_data,class_model,class_type,epoch,learn_rate,False,False,[train_data])
 

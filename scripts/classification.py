@@ -15,35 +15,54 @@ from .model_cnn_lstm import CNN_LSTM
 from .model_transformer import EEGTransformerClassifier
 
 class classification:
-    def __init__(self, data_path, model_path, log_path, name, model, model_type="cnn", num_epochs=10):
-        self.data_path = data_path
-        self.model_path = model_path
-        self.log_path = log_path
-        self.num_epochs = num_epochs
-        self.model_type = model_type
-        self.model_name = f"{model}_class_{model_type}.pth"
-        self.log_name = f"{model}_class_{model_type}.txt"
-        self.test_log_name = "test_log.txt"
-        self.time_log_name = "time_log.txt"
-        self.seiz_name = f"{name}_seiz.mat"
-        self.nseiz_name = f"{name}_nseiz.mat"
-        self.name = name
+    def __init__(self, path_config, model_config, param_config):
+        self.data_path = path_config.get("gen_path")
+        self.model_path = path_config.get("model_path")
+        self.log_path = path_config.get("log_path")
+        
+        self.model_type = model_config.get("model_type", "cnn")
+        self.epoch_num = model_config.get("epoch_num", 10)
+        self.learning_rate = model_config.get("learning_rate", 1e-3)
+        
+        self.name_prefix = param_config.get("name_prefix")
+        self.model_prefix = param_config.get("model_prefix")
+        self.namelist = param_config.get("namelist", [self.name_prefix])
+        
+        is_usemat = param_config.get("is_usemat", False)
+        is_usetrain = param_config.get("is_usetrain", False)
+        if is_usemat:
+            self.data_path = path_config.get("mat_path")
+        elif is_usetrain:
+            self.data_path = path_config.get("data_path")
+        
+        #self.device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.label = "data"
+        self.file_config()
 
-    def file_config(self, name, namelist=[]):
-        self.seizlist = [f"{name}_seiz.mat" for name in namelist]
-        self.nseizlist = [f"{name}_nseiz.mat" for name in namelist]
+    def file_config(self):
+        model_name = f"{self.model_prefix}_class_{self.model_type}.pth"
+        log_name = f"{self.model_prefix}_class_{self.model_type}.txt"
+        test_log_name = "test_log.txt"
+        time_log_name = "time_log.txt"
+        seiz_name = f"{self.name_prefix}_seiz.mat"
+        nseiz_name = f"{self.name_prefix}_nseiz.mat"
+        self.seizlist = [f"{name}_seiz.mat" for name in self.namelist]
+        self.nseizlist = [f"{name}_nseiz.mat" for name in self.namelist]
+        self.model_file = os.path.join(self.model_path, model_name)
+        self.log_file = os.path.join(self.log_path, log_name)
+        self.test_log_file = os.path.join(self.log_path, test_log_name)
+        self.time_log_file = os.path.join(self.log_path, time_log_name)
 
     def get_model(self, num_classes, load_pretrain=False):
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if self.model_type=="cnn":
-            model = CNN(num_classes=num_classes).to(device)
+            model = CNN(num_classes=num_classes).to(self.device)
         elif self.model_type=="lstm":
-            model = CNN_LSTM(num_classes=num_classes).to(device)
+            model = CNN_LSTM(num_classes=num_classes).to(self.device)
         elif self.model_type=="transformer":
-            if "our" in self.name:
+            if "our" in self.name_prefix:
                 num_channels = 26
-            elif "nicu" in self.name:
+            elif "nicu" in self.name_prefix:
                 num_channels = 21
             else:
                 num_channels = 21
@@ -59,21 +78,18 @@ class classification:
                 drop_rate=0.1,        # Dropout rate
                 attn_drop_rate=0.1,   # Attention dropout rate
                 drop_path_rate=0.1    # Stochastic depth rate
-            ).to(device)
+            ).to(self.device)
         else:
             raise ValueError(f"Invalid model type {self.model_type}")
         criterion = nn.CrossEntropyLoss()
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-        if load_pretrain==True:
-            print("load model: ", self.model_name)
-            model_file = os.path.join(self.model_path, self.model_name)
-            state_dict = torch.load(model_file, map_location=device, weights_only=True)
+        optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
+        if load_pretrain:
+            print("load model: ", self.model_file)
+            state_dict = torch.load(self.model_file, map_location=self.device, weights_only=True)
             model.load_state_dict(state_dict)
-        return device, model, criterion, optimizer
+        return model, criterion, optimizer
 
     def get_data(self):
-        #seiz_data = mat2numpy(os.path.join(self.data_path, self.seiz_name), self.label)
-        #nseiz_data = mat2numpy(os.path.join(self.data_path, self.nseiz_name), self.label)
         seiz_datalist = []
         nseiz_datalist = []
         for seizfile, nseizfile in zip(self.seizlist, self.nseizlist):
@@ -107,26 +123,26 @@ class classification:
         
         torch.manual_seed(1)
         
-        trainloader = torch_dataloader(X_train, y_train, batch_size=64, datatype="train")
-        testloader = torch_dataloader(X_test, y_test, batch_size=64, datatype="test")
+        trainloader = torch_dataloader(X_train, y_train, batch_size=64, is_train=True)
+        testloader = torch_dataloader(X_test, y_test, batch_size=64, is_train=False)
         return trainloader, testloader, num_classes
 
     def train(self):
         # Create results log file header
-        with open(os.path.join(self.log_path, self.log_name), "w") as f:
+        with open(self.log_file, "w") as f:
             f.write("epoch,train_loss,val_acc,val_sen,val_spe,val_f1\n")
         
         # get data
         trainloader, testloader, num_classes = self.get_data()
-        device, model, criterion, optimizer = self.get_model(num_classes, load_pretrain=False)
+        model, criterion, optimizer = self.get_model(num_classes, load_pretrain=False)
         best_accuracy = 0.0
         # track time for process
         start_time = datetime.now()
-        for epoch in range(self.num_epochs):
+        for epoch in range(self.epoch_num):
             model.train()
             running_loss = 0.0
             for X, y in trainloader:
-                X, y = X.to(device), y.to(device)
+                X, y = X.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
                 output = model(X)
                 loss = criterion(output, y)
@@ -142,7 +158,7 @@ class classification:
             TP = TN = FP = FN = 0
             with torch.no_grad():
                 for X, y in testloader:
-                    X, y = X.to(device), y.to(device)
+                    X, y = X.to(self.device), y.to(self.device)
                     outputs = model(X)
                     _, predicted = torch.max(outputs.data, 1)
                     TP += ((predicted == 1) & (y == 1)).sum().item()
@@ -158,30 +174,30 @@ class classification:
             print(f"acc: {accuracy * 100:.2f}%, sen: {sensitivity * 100:.2f}%, spe: {specificity * 100:.2f}%, f1: {f1 * 100:.2f}%")
             
             # Log results to file
-            with open(os.path.join(self.log_path, self.log_name), "a") as f:
+            with open(self.log_file, "a") as f:
                 f.write(f"{epoch+1},{avg_loss:.4f},{accuracy:.4f},{sensitivity:.4f},{specificity:.4f},{f1:.4f}\n")
             # Save best model
             if accuracy > best_accuracy:
                 best_accuracy = accuracy
-                torch.save(model.state_dict(), os.path.join(self.model_path, self.model_name))
+                torch.save(model.state_dict(), self.model_file)
                 print(f"Best model saved with accuracy: {best_accuracy:.2f}%")
         
         # track time for process
         end_time = datetime.now()
         time_taken = end_time - start_time
         # Log results to file
-        with open(os.path.join(self.log_path, self.time_log_name), "a") as f:
-            f.write(f"Class {self.name}_{self.model_type} Train Time:{time_taken}\n")
-        print("saved model to", self.model_name)
-        print("results logged to", self.log_name)
+        with open(self.time_log_file, "a") as f:
+            f.write(f"Class {self.name_prefix}_{self.model_type} Train Time:{time_taken}\n")
+        print("saved model to", self.model_file)
+        print("results logged to", self.log_file)
         print("time taken:", time_taken)
 
     def test(self):
-        print(f"testing {self.name}")
+        print(f"testing {self.name_prefix}")
+        # get data
         trainloader, testloader, num_classes = self.get_data()
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         # Load model
-        device, model, criterion, optimizer = self.get_model(num_classes, load_pretrain=True)
+        model, criterion, optimizer = self.get_model(num_classes, load_pretrain=True)
         model.eval()
         correct = 0
         total = 0
@@ -189,7 +205,7 @@ class classification:
         start_time = datetime.now()
         with torch.no_grad():
             for X, y in testloader:
-                X, y = X.to(device), y.to(device)
+                X, y = X.to(self.device), y.to(self.device)
                 outputs = model(X)
                 _, predicted = torch.max(outputs.data, 1)
                 total += y.size(0)
@@ -201,8 +217,8 @@ class classification:
         print(f"Test Accuracy: {accuracy:.2f}%")
         print("time Taken:", time_taken)
         # Log results to file
-        with open(os.path.join(self.log_path, self.test_log_name), "a") as f:
-            f.write(f"Class {self.name}_{self.model_type} Accuracy:{accuracy:.2f}%\n")
-        with open(os.path.join(self.log_path, self.time_log_name), "a") as f:
-            f.write(f"Class {self.name}_{self.model_type} Test Time:{time_taken}\n")
+        with open(self.test_log_file, "a") as f:
+            f.write(f"Class {self.name_prefix}_{self.model_type} Accuracy:{accuracy:.2f}%\n")
+        with open(self.time_log_file, "a") as f:
+            f.write(f"Class {self.name_prefix}_{self.model_type} Test Time:{time_taken}\n")
 

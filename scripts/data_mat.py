@@ -75,6 +75,7 @@ class data_mat:
 
     def custom_mask(self, data, channels):
         # get masked data by custom blocked channels
+        mdata_list = []
         for sample in data:
             mdata = self.get_mask(sample, channels, self.block_ch)
             mdata_list.append(mdata)

@@ -102,10 +102,10 @@ class reconstruct:
         else:
             raise ValueError(f"Invalid model type {self.model_type}")
         optimizer = optim.Adam(model.parameters(), lr=self.learning_rate)
-        if load_pretrain==True:
+        if load_pretrain:
             # load pretrained model
             print("load model:", self.model_file)
-            state_dict = torch.load(self.model_file, weights_only=True)
+            state_dict = torch.load(self.model_file, map_location=self.device, weights_only=True)
             model.load_state_dict(state_dict)
         return model, criterion, optimizer
 
@@ -160,8 +160,8 @@ class reconstruct:
         print(f"input_shape = {X_orig[0].shape}\noutput_shape = {y_orig[0].shape}")
         
         # prepare dataloader
-        train_loader = torch_dataloader(X_train, y_train, batch_size=32, datatype="train")
-        test_loader = torch_dataloader(X_test, y_test, batch_size=32, datatype="test")
+        train_loader = torch_dataloader(X_train, y_train, batch_size=32, is_train=True)
+        test_loader = torch_dataloader(X_test, y_test, batch_size=32, is_train=False)
         
         # in channels out channels
         in_ch = X_orig[0].shape[0]
@@ -221,7 +221,7 @@ class reconstruct:
         y_norm = torch.tensor(y_norm, dtype=torch.float32)
         
         # prepare dataloader full dataset no split
-        full_loader = torch_dataloader(X_norm, y_norm, batch_size=32, datatype="test")
+        full_loader = torch_dataloader(X_norm, y_norm, batch_size=32, is_train=False)
         
         # in channels out channels
         in_ch = X_orig[0].shape[0]

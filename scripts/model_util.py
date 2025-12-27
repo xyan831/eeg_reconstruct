@@ -38,17 +38,15 @@ def kfold_split(data, label):
         break  # Use first fold
     return X_train, X_test, y_train, y_test
 
-def torch_dataloader(X_data, y_data, batch_size=32, datatype="test"):
+def torch_dataloader(X_data, y_data, batch_size=32, is_train=False):
     # Convert to PyTorch tensors for torch unet
     data = TensorDataset(X_data, y_data)
     
     # Create dataloader
-    if datatype == "train":
+    if is_train:
         data_loader = DataLoader(data, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
-    elif datatype == "test":
-        data_loader = DataLoader(data, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
     else:
-        print("error: invalid datatype")
+        data_loader = DataLoader(data, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
     return data_loader
 
 # ----------------------
