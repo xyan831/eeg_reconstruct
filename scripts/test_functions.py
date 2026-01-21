@@ -124,9 +124,9 @@ if __name__ == "__main__":
         "model_path": "result/model",
         "visual_path": "result/visual",
         "log_path": "result/log",
-        "gen_path": "result/data_gen",
-        "data_path": "result/data_train",
-        "mat_path": "result/data_mat",
+        "gen_path": "result/gen_data",
+        "data_path": "result/train_data",
+        "mat_path": "result/raw_data",
         "raw_path": raw_path
     }
     

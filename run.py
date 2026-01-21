@@ -134,9 +134,9 @@ if __name__ == "__main__":
         "model_path": "result/model",
         "visual_path": "result/visual",
         "log_path": "result/log",
-        "gen_path": "result/data_gen",
-        "data_path": "result/data_train",
-        "mat_path": "result/data_mat",
+        "gen_path": "result/gen_data",
+        "data_path": "result/train_data",
+        "mat_path": "result/raw_data",
         "raw_path": raw_path
     }
     
@@ -144,21 +144,21 @@ if __name__ == "__main__":
     
     #prepare_dataset(path_config, ch_max, block_ch, is_custom, name_ch)
     
-    recon_train(path_config, "our", our_data1, our_recon_model, epoch, learn_rate, isFFT, savebest, makevis, sample)
-    recon_train(path_config, "nicu", nicu_data1, nicu_recon_model, epoch, learn_rate, isFFT, savebest, makevis, sample)
+    #recon_train(path_config, "our", our_data1, our_recon_model, epoch, learn_rate, isFFT, savebest, makevis, sample)
+    #recon_train(path_config, "nicu", nicu_data1, nicu_recon_model, epoch, learn_rate, isFFT, savebest, makevis, sample)
     
-    recon_test(path_config, our_data2, our_recon_model, epoch, learn_rate, isFFT, savebest, makevis, sample):
-    recon_test(path_config, nicu_data2, nicu_recon_model, epoch, learn_rate, isFFT, savebest, makevis, sample):
+    #recon_test(path_config, our_data2, our_recon_model, epoch, learn_rate, isFFT, savebest, makevis, sample):
+    #recon_test(path_config, nicu_data2, nicu_recon_model, epoch, learn_rate, isFFT, savebest, makevis, sample):
     
     epoch = 50
-    class_train(path_config, name_ch, our_data1, our_recon_model, epoch, learn_rate, ["our01","our02","our03"])
-    class_train(path_config, name_ch, nicu_data1, nicu_recon_model, epoch, learn_rate, ["nicu01"])
+    #class_train(path_config, name_ch, our_data1, our_recon_model, epoch, learn_rate, ["our01","our02","our03"])
+    #class_train(path_config, name_ch, nicu_data1, nicu_recon_model, epoch, learn_rate, ["nicu01"])
     
-    class_test1(path_config, our_data2, our_recon_model, epoch, learn_rate)
-    class_test1(path_config, nicu_data2, nicu_recon_model, epoch, learn_rate)
+    #class_test1(path_config, our_data2, our_recon_model, epoch, learn_rate)
+    #class_test1(path_config, nicu_data2, nicu_recon_model, epoch, learn_rate)
     
-    class_test2(path_config, our_data2, our_recon_model, epoch, learn_rate)
-    class_test2(path_config, nicu_data2, nicu_recon_model, epoch, learn_rate)
+    #class_test2(path_config, our_data2, our_recon_model, epoch, learn_rate)
+    #class_test2(path_config, nicu_data2, nicu_recon_model, epoch, learn_rate)
 
 
 
